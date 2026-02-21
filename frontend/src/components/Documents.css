@@ -1,0 +1,228 @@
+.documents-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.upload-card,
+.list-card {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+}
+
+.upload-btn {
+    background: #2a9d8f;
+    color: white;
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background 0.2s;
+}
+
+.upload-btn:hover {
+    background: #21867a;
+}
+
+.upload-btn:disabled {
+    background: #ccc;
+}
+
+.doc-list {
+    list-style: none;
+    padding: 0;
+}
+
+.doc-item-expanded {
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 15px;
+    margin-bottom: 15px;
+    border: 1px solid #e9ecef;
+}
+
+.doc-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.doc-icon {
+    font-size: 2rem;
+    margin-right: 15px;
+}
+
+.doc-info {
+    flex: 1;
+}
+
+.doc-info h4 {
+    margin: 0 0 5px 0;
+    color: #333;
+}
+
+.doc-meta {
+    color: #777;
+    font-size: 0.85rem;
+}
+
+/* Verification Info */
+.verification-info {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.verification-id,
+.doc-hash {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #e7f5ff;
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.verification-id:hover,
+.doc-hash:hover {
+    background: #d0ebff;
+}
+
+.verification-id .label,
+.doc-hash .label {
+    font-weight: 600;
+    color: #1864ab;
+    font-size: 0.8rem;
+}
+
+.verification-id .value {
+    font-family: monospace;
+    color: #1864ab;
+    font-weight: 500;
+}
+
+.doc-hash .value {
+    font-family: monospace;
+    color: #495057;
+    font-size: 0.85rem;
+}
+
+.copy-icon {
+    font-size: 0.8rem;
+    opacity: 0.7;
+}
+
+/* Action Buttons Grid */
+.doc-actions-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+}
+
+.action-btn {
+    padding: 8px 12px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+
+.action-btn.preview {
+    background: #28a745;
+    color: white;
+}
+
+.action-btn.preview:hover {
+    background: #218838;
+}
+
+.action-btn.download {
+    background: #007bff;
+    color: white;
+}
+
+.action-btn.download:hover {
+    background: #0056b3;
+}
+
+.action-btn.qr {
+    background: #6f42c1;
+    color: white;
+}
+
+.action-btn.qr:hover {
+    background: #5a32a3;
+}
+
+.action-btn.share {
+    background: #17a2b8;
+    color: white;
+}
+
+.action-btn.share:hover {
+    background: #138496;
+}
+
+/* QR Popup */
+.qr-popup {
+    position: relative;
+    margin-top: 15px;
+    padding: 20px;
+    background: white;
+    border-radius: 10px;
+    text-align: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.qr-popup .qr-id {
+    margin-top: 10px;
+    font-family: monospace;
+    font-weight: 600;
+    color: #1864ab;
+}
+
+.close-qr {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    background: none;
+    border: none;
+    font-size: 1.2rem;
+    cursor: pointer;
+    color: #666;
+}
+
+.close-qr:hover {
+    color: #333;
+}
+
+.empty-state {
+    text-align: center;
+    color: #999;
+    font-style: italic;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+    .doc-actions-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .verification-info {
+        flex-direction: column;
+        gap: 8px;
+    }
+}

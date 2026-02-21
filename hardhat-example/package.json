@@ -1,0 +1,17 @@
+{
+  "name": "userauth-deployment",
+  "version": "1.0.0",
+  "description": "Hardhat deployment configuration for UserAuth contract",
+  "scripts": {
+    "deploy": "hardhat run scripts/deploy.js --network poa",
+    "deploy:localhost": "hardhat run scripts/deploy.js --network localhost",
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "node": "hardhat node"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "hardhat": "^2.19.4",
+    "dotenv": "^16.3.1"
+  }
+}

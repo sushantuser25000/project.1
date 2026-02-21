@@ -1,0 +1,12 @@
+version: "2"
+tunnels:
+  blockchain:
+    proto: http
+    addr: 8545
+  backend:
+    proto: http
+    addr: 5000
+  frontend:
+    proto: http
+    addr: 3000
+    domain: vaporific-higher-shirlene.ngrok-free.dev
