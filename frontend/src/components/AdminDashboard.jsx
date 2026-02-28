@@ -9,10 +9,23 @@ const AdminDashboard = ({ account, onLogout }) => {
     const [verifyingId, setVerifyingId] = useState(null);
     const [adminKey, setAdminKey] = useState('');
     const [showKeyField, setShowKeyField] = useState(false);
+    const [previewDoc, setPreviewDoc] = useState(null);
+    const [rejectingDoc, setRejectingDoc] = useState(null);
+    const [rejectReason, setRejectReason] = useState('');
 
+    // Restore admin key from sessionStorage
     useEffect(() => {
+        const savedKey = sessionStorage.getItem('admin_key');
+        if (savedKey) setAdminKey(savedKey);
         fetchPendingDocs();
     }, []);
+
+    // Persist admin key to sessionStorage when updated
+    useEffect(() => {
+        if (adminKey) {
+            sessionStorage.setItem('admin_key', adminKey);
+        }
+    }, [adminKey]);
 
     const fetchPendingDocs = async () => {
         try {
@@ -67,18 +80,19 @@ const AdminDashboard = ({ account, onLogout }) => {
         }
     };
 
-    const handleReject = async (doc) => {
+    const handleRejectSubmit = async () => {
+        if (!rejectReason.trim()) {
+            alert('Please enter a rejection reason');
+            return;
+        }
         if (!adminKey) {
             setShowKeyField(true);
             alert('Please enter your Organization Private Key');
             return;
         }
 
-        const reason = prompt("Enter rejection reason:");
-        if (!reason) return;
-
         try {
-            setVerifyingId(doc.verificationId);
+            setVerifyingId(rejectingDoc.verificationId);
             const response = await fetch(`${API_URL}/api/admin/reject`, {
                 method: 'POST',
                 headers: {
@@ -86,8 +100,8 @@ const AdminDashboard = ({ account, onLogout }) => {
                     'Bypass-Tunnel-Reminder': 'true'
                 },
                 body: JSON.stringify({
-                    verificationId: doc.verificationId,
-                    reason: reason,
+                    verificationId: rejectingDoc.verificationId,
+                    reason: rejectReason,
                     adminPrivateKey: adminKey
                 })
             });
@@ -96,6 +110,8 @@ const AdminDashboard = ({ account, onLogout }) => {
             if (data.success) {
                 alert('Document rejected on-chain.');
                 fetchPendingDocs();
+                setRejectingDoc(null);
+                setRejectReason('');
             } else {
                 throw new Error(data.error || 'Rejection failed');
             }
@@ -106,16 +122,16 @@ const AdminDashboard = ({ account, onLogout }) => {
         }
     };
 
-    const handlePreview = async (driveFileId, docName) => {
-        window.open(`${API_URL}/api/documents/preview/${account}/${driveFileId}?name=${encodeURIComponent(docName)}`, '_blank');
+    const handlePreviewInline = (doc) => {
+        setPreviewDoc(previewDoc?.verificationId === doc.verificationId ? null : doc);
     };
 
     return (
         <div className="dashboard-container">
             <div className="dashboard-header">
-                <h1>Organization Admin Panel (ACEM)</h1>
+                <h1>Organization Admin Panel</h1>
                 <div className="user-badge">
-                    <span>Admin: {account}</span>
+                    <span>Admin: {account.slice(0, 8)}...{account.slice(-4)}</span>
                     <button className="logout-btn" onClick={onLogout}>Logout</button>
                 </div>
             </div>
@@ -125,7 +141,7 @@ const AdminDashboard = ({ account, onLogout }) => {
                     <h3>Verification Queue (Pending Approval)</h3>
 
                     <div className="admin-actions">
-                        <button className="refresh-btn" onClick={fetchPendingDocs}>Refresh Queue</button>
+                        <button className="refresh-btn" onClick={fetchPendingDocs}>🔄 Refresh Queue</button>
                         <div className="key-input-group">
                             <input
                                 type={showKeyField ? "text" : "password"}
@@ -151,44 +167,77 @@ const AdminDashboard = ({ account, onLogout }) => {
                                     <th>Document Details</th>
                                     <th>Type</th>
                                     <th>Uploader</th>
+                                    <th>Hash</th>
                                     <th>Date</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {pendingDocs.map((doc) => (
-                                    <tr key={doc.verificationId}>
-                                        <td>
-                                            <div style={{ fontWeight: 'bold' }}>{doc.docName}</div>
-                                            <div style={{ fontSize: '0.8rem', color: '#666' }}>{doc.verificationId}</div>
-                                        </td>
-                                        <td>{doc.docType}</td>
-                                        <td>{doc.userId.slice(0, 8)}...</td>
-                                        <td>{new Date(doc.uploadedAt).toLocaleString()}</td>
-                                        <td>
-                                            <button
-                                                className="preview-btn"
-                                                onClick={() => handlePreview(doc.driveFileId, doc.docName)}
-                                            >
-                                                Review
-                                            </button>
-                                            <button
-                                                className="verify-action-btn"
-                                                disabled={verifyingId === doc.verificationId}
-                                                onClick={() => handleVerify(doc)}
-                                                style={{ marginRight: '8px' }}
-                                            >
-                                                {verifyingId === doc.verificationId ? '...' : 'Verify'}
-                                            </button>
-                                            <button
-                                                className="reject-action-btn"
-                                                disabled={verifyingId === doc.verificationId}
-                                                onClick={() => handleReject(doc)}
-                                            >
-                                                {verifyingId === doc.verificationId ? '...' : 'Reject'}
-                                            </button>
-                                        </td>
-                                    </tr>
+                                    <React.Fragment key={doc.verificationId}>
+                                        <tr>
+                                            <td>
+                                                <div style={{ fontWeight: 'bold' }}>{doc.docName}</div>
+                                                <div style={{ fontSize: '0.8rem', color: '#666' }}>{doc.verificationId}</div>
+                                            </td>
+                                            <td>{doc.docType}</td>
+                                            <td title={doc.userId}>{doc.userId.slice(0, 8)}...</td>
+                                            <td>
+                                                {doc.contentHash ? (
+                                                    <span className="hash-preview" title={doc.contentHash}>
+                                                        {doc.contentHash.slice(0, 10)}...
+                                                    </span>
+                                                ) : '—'}
+                                            </td>
+                                            <td>{new Date(doc.uploadedAt).toLocaleString()}</td>
+                                            <td>
+                                                <button
+                                                    className="preview-btn"
+                                                    onClick={() => handlePreviewInline(doc)}
+                                                >
+                                                    {previewDoc?.verificationId === doc.verificationId ? '✕ Close' : '👁️ Review'}
+                                                </button>
+                                                <button
+                                                    className="verify-action-btn"
+                                                    disabled={verifyingId === doc.verificationId}
+                                                    onClick={() => handleVerify(doc)}
+                                                    style={{ marginRight: '8px' }}
+                                                >
+                                                    {verifyingId === doc.verificationId ? '...' : '✅ Verify'}
+                                                </button>
+                                                <button
+                                                    className="reject-action-btn"
+                                                    disabled={verifyingId === doc.verificationId}
+                                                    onClick={() => { setRejectingDoc(doc); setRejectReason(''); }}
+                                                >
+                                                    {verifyingId === doc.verificationId ? '...' : '❌ Reject'}
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        {/* Inline Document Preview */}
+                                        {previewDoc?.verificationId === doc.verificationId && (
+                                            <tr>
+                                                <td colSpan="6">
+                                                    <div className="inline-preview">
+                                                        <h4>📄 Document Preview</h4>
+                                                        <iframe
+                                                            src={`${API_URL}/api/documents/preview/${account}/${doc.driveFileId}?name=${encodeURIComponent(doc.docName)}`}
+                                                            title="Document Preview"
+                                                            className="preview-iframe"
+                                                        />
+                                                        <a
+                                                            href={`${API_URL}/api/documents/preview/${account}/${doc.driveFileId}?name=${encodeURIComponent(doc.docName)}`}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            className="open-tab-link"
+                                                        >
+                                                            Open in new tab ↗
+                                                        </a>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </React.Fragment>
                                 ))}
                             </tbody>
                         </table>
@@ -196,7 +245,36 @@ const AdminDashboard = ({ account, onLogout }) => {
                 </div>
             </div>
 
-            <style jsx>{`
+            {/* Rejection Modal */}
+            {rejectingDoc && (
+                <div className="modal-overlay">
+                    <div className="modal-content">
+                        <h3>❌ Reject Document</h3>
+                        <p>Document: <strong>{rejectingDoc.docName}</strong></p>
+                        <p>ID: <code>{rejectingDoc.verificationId}</code></p>
+                        <label style={{ display: 'block', marginTop: '15px', fontWeight: '600' }}>Rejection Reason:</label>
+                        <textarea
+                            value={rejectReason}
+                            onChange={(e) => setRejectReason(e.target.value)}
+                            placeholder="e.g., Document is blurry, information is incomplete..."
+                            className="reject-textarea"
+                            rows={4}
+                        />
+                        <div className="modal-actions">
+                            <button onClick={() => { setRejectingDoc(null); setRejectReason(''); }} className="cancel-btn">Cancel</button>
+                            <button
+                                onClick={handleRejectSubmit}
+                                className="confirm-reject-btn"
+                                disabled={!rejectReason.trim() || verifyingId === rejectingDoc.verificationId}
+                            >
+                                {verifyingId === rejectingDoc.verificationId ? 'Processing...' : 'Confirm Rejection'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <style>{`
         .admin-table {
           width: 100%;
           border-collapse: collapse;
@@ -257,11 +335,108 @@ const AdminDashboard = ({ account, onLogout }) => {
           border: none;
           padding: 8px 16px;
           border-radius: 4px;
+          cursor: pointer;
         }
         .empty-msg {
           text-align: center;
           padding: 40px;
           color: #888;
+        }
+        .hash-preview {
+          font-family: monospace;
+          font-size: 0.8rem;
+          color: #1864ab;
+          cursor: help;
+        }
+        .inline-preview {
+          padding: 20px;
+          background: #f0f4f8;
+          border-radius: 8px;
+          text-align: center;
+        }
+        .inline-preview h4 {
+          margin: 0 0 12px 0;
+        }
+        .preview-iframe {
+          width: 100%;
+          height: 500px;
+          border: 2px solid #dee2e6;
+          border-radius: 6px;
+          background: white;
+        }
+        .open-tab-link {
+          display: inline-block;
+          margin-top: 10px;
+          color: #007bff;
+          text-decoration: none;
+          font-size: 0.9rem;
+        }
+        .open-tab-link:hover {
+          text-decoration: underline;
+        }
+        .modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0,0,0,0.5);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+        }
+        .modal-content {
+          background: white;
+          padding: 30px;
+          border-radius: 12px;
+          max-width: 500px;
+          width: 90%;
+          box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        .modal-content h3 {
+          margin-top: 0;
+        }
+        .reject-textarea {
+          width: 100%;
+          padding: 12px;
+          border: 2px solid #ddd;
+          border-radius: 8px;
+          font-size: 0.95rem;
+          resize: vertical;
+          margin-top: 8px;
+          font-family: inherit;
+        }
+        .reject-textarea:focus {
+          outline: none;
+          border-color: #dc3545;
+        }
+        .modal-actions {
+          display: flex;
+          gap: 12px;
+          justify-content: flex-end;
+          margin-top: 20px;
+        }
+        .cancel-btn {
+          padding: 10px 20px;
+          background: #e9ecef;
+          border: none;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 0.95rem;
+        }
+        .confirm-reject-btn {
+          padding: 10px 20px;
+          background: #dc3545;
+          color: white;
+          border: none;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 0.95rem;
+        }
+        .confirm-reject-btn:disabled {
+          background: #ccc;
+          cursor: not-allowed;
         }
       `}</style>
         </div>

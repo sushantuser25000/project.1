@@ -1,6 +1,8 @@
 {
-  "userAuthAddress": "0x4de0a92C6EF927DCd8e3a804eb8Bc21AE0758268",
-  "orgRegistryAddress": "0xd8A2d9A7e111c886C6e3eF14CaA86F1a8c977Fc4",
+  "contractAddress": "0xdbD875792f299c542A34784F21aBfa12C20611bf",
   "network": "localhost",
-  "timestamp": "2026-02-21T05:33:21.533Z"
+  "chainId": 2025,
+  "deployer": "0x6bbb7F23448Dbf15EbB4F0A2f0E09FC9b2bD9C2F",
+  "timestamp": "2026-02-28T07:54:52.049Z",
+  "blockNumber": 1275
 }

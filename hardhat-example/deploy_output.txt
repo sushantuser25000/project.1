@@ -1,0 +1,13 @@
+﻿≡ƒÜÇ Starting standalone deployment via unlocked node account...
+≡ƒæñ Deploying from unlocked account: 0x6bbb7F23448Dbf15EbB4F0A2f0E09FC9b2bD9C2F
+
+ΓÅ│ Deploying UserAuth...
+Γ£à UserAuth deployed at: 0x11D5ea94e4A78A95dEbc799DCB4420471B5945d6
+
+ΓÅ│ Deploying OrgRegistry...
+Γ£à OrgRegistry deployed at: 0xae20A352fd17dE8111708979671D3E16D667045E
+
+≡ƒôï Next Steps:
+Update backend/.env and frontend/.env with:
+CONTRACT_ADDRESS=0x11D5ea94e4A78A95dEbc799DCB4420471B5945d6
+ORG_REGISTRY_ADDRESS=0xae20A352fd17dE8111708979671D3E16D667045E

@@ -2,8 +2,6 @@
 pragma solidity ^0.8.0;
 
 contract OrgRegistry {
-    enum VerificationStatus { NONE, PENDING, VERIFIED, REJECTED }
-
     struct Organization {
         string name;
         address wallet;
@@ -18,8 +16,12 @@ contract OrgRegistry {
         string remarks;
     }
 
-    struct VerificationRecord {
-        address uploader;
+    // Verification request status enum
+    enum VerificationStatus { NONE, PENDING, VERIFIED, REJECTED }
+
+    struct VerificationRequest {
+        string verificationId;
+        address requester;
         address verifierOrg;
         VerificationStatus status;
         string rejectionReason;
@@ -27,9 +29,9 @@ contract OrgRegistry {
     }
 
     mapping(address => Organization) public organizations;
-    address[] public orgList;
     mapping(string => VerificationLog[]) public documentAuditTrail;
-    mapping(string => VerificationRecord) public verifications;
+    mapping(string => VerificationRequest) public verificationRequests;
+    address[] public orgAddresses;
     address public owner;
 
     event OrganizationRegistered(address indexed wallet, string name);
@@ -52,15 +54,13 @@ contract OrgRegistry {
     }
 
     function registerOrganization(string memory _name, address _wallet) public onlyOwner {
-        if (organizations[_wallet].registeredAt == 0) {
-            orgList.push(_wallet);
-        }
         organizations[_wallet] = Organization({
             name: _name,
             wallet: _wallet,
             isAuthorized: true,
             registeredAt: block.timestamp
         });
+        orgAddresses.push(_wallet);
         emit OrganizationRegistered(_wallet, _name);
     }
 
@@ -69,14 +69,21 @@ contract OrgRegistry {
     }
 
     function getAllOrganizations() public view returns (address[] memory) {
-        return orgList;
+        return orgAddresses;
     }
 
+    // User requests verification from a specific org
     function requestVerification(string memory _verificationId, address _org) public {
-        require(organizations[_org].isAuthorized, "Target organization is not authorized");
-        
-        verifications[_verificationId] = VerificationRecord({
-            uploader: msg.sender,
+        require(organizations[_org].isAuthorized, "Target org not authorized");
+        require(
+            verificationRequests[_verificationId].status == VerificationStatus.NONE ||
+            verificationRequests[_verificationId].status == VerificationStatus.REJECTED,
+            "Verification already in progress or completed"
+        );
+
+        verificationRequests[_verificationId] = VerificationRequest({
+            verificationId: _verificationId,
+            requester: msg.sender,
             verifierOrg: _org,
             status: VerificationStatus.PENDING,
             rejectionReason: "",
@@ -86,9 +93,15 @@ contract OrgRegistry {
         emit VerificationRequested(_verificationId, msg.sender, _org);
     }
 
+    // Authorized org verifies a document
     function verifyDocument(string memory _verificationId, string memory _remarks) public onlyAuthorizedOrg {
-        require(verifications[_verificationId].verifierOrg == msg.sender, "Not the assigned verifier");
-        
+        VerificationRequest storage req = verificationRequests[_verificationId];
+        require(req.status == VerificationStatus.PENDING, "Not pending");
+        require(req.verifierOrg == msg.sender, "Not assigned verifier");
+
+        req.status = VerificationStatus.VERIFIED;
+        req.lastUpdated = block.timestamp;
+
         VerificationLog memory log = VerificationLog({
             verificationId: _verificationId,
             verifierOrg: msg.sender,
@@ -96,29 +109,34 @@ contract OrgRegistry {
             remarks: _remarks
         });
 
-        verifications[_verificationId].status = VerificationStatus.VERIFIED;
-        verifications[_verificationId].lastUpdated = block.timestamp;
-
         documentAuditTrail[_verificationId].push(log);
         emit DocumentVerified(_verificationId, msg.sender, block.timestamp);
     }
 
+    // Authorized org rejects a document
     function rejectDocument(string memory _verificationId, string memory _reason) public onlyAuthorizedOrg {
-        require(verifications[_verificationId].verifierOrg == msg.sender, "Not the assigned verifier");
-        
-        verifications[_verificationId].status = VerificationStatus.REJECTED;
-        verifications[_verificationId].rejectionReason = _reason;
-        verifications[_verificationId].lastUpdated = block.timestamp;
+        VerificationRequest storage req = verificationRequests[_verificationId];
+        require(req.status == VerificationStatus.PENDING, "Not pending");
+        require(req.verifierOrg == msg.sender, "Not assigned verifier");
+
+        req.status = VerificationStatus.REJECTED;
+        req.rejectionReason = _reason;
+        req.lastUpdated = block.timestamp;
 
         emit DocumentRejected(_verificationId, msg.sender, _reason);
     }
 
-    function getAuditTrail(string memory _verificationId) public view returns (VerificationLog[] memory) {
-        return documentAuditTrail[_verificationId];
+    function getVerificationStatus(string memory _verificationId) public view returns (
+        VerificationStatus status,
+        address verifierOrg,
+        string memory rejectionReason,
+        uint256 lastUpdated
+    ) {
+        VerificationRequest memory req = verificationRequests[_verificationId];
+        return (req.status, req.verifierOrg, req.rejectionReason, req.lastUpdated);
     }
 
-    function getVerificationStatus(string memory _verificationId) public view returns (VerificationStatus status, address verifierOrg, string memory rejectionReason, uint256 lastUpdated) {
-        VerificationRecord memory record = verifications[_verificationId];
-        return (record.status, record.verifierOrg, record.rejectionReason, record.lastUpdated);
+    function getAuditTrail(string memory _verificationId) public view returns (VerificationLog[] memory) {
+        return documentAuditTrail[_verificationId];
     }
 }

@@ -555,6 +555,26 @@ app.get('/api/verify/id/:verificationId', async (req, res) => {
             });
         }
 
+        // Fetch org verification status
+        let verificationStatus = { status: 0, statusText: 'NOT_REQUESTED', verifierOrg: null, verificationDate: null, rejectionReason: '' };
+        if (orgRegistry) {
+            try {
+                const statusData = await orgRegistry.getVerificationStatus(verificationId);
+                const statusNum = Number(statusData[0]);
+                const statusMap = ['NOT_REQUESTED', 'PENDING', 'VERIFIED', 'REJECTED'];
+                verificationStatus = {
+                    status: statusNum,
+                    statusText: statusMap[statusNum] || 'UNKNOWN',
+                    verifierOrg: statusData[1],
+                    rejectionReason: statusData[2],
+                    verificationDate: Number(statusData[3]) > 0 ? new Date(Number(statusData[3]) * 1000).toISOString() : null
+                };
+            } catch (e) { /* not requested yet */ }
+        }
+
+        // Derive userId from owner address
+        const userId = owner.toLowerCase().replace('0x', '').slice(-16);
+
         res.json({
             verified: true,
             document: {
@@ -563,8 +583,10 @@ app.get('/api/verify/id/:verificationId', async (req, res) => {
                 owner,
                 contentHash,
                 uploadedAt: new Date(Number(uploadedAt) * 1000).toISOString(),
-                verificationId
-            }
+                verificationId,
+                userId
+            },
+            verificationStatus
         });
 
     } catch (error) {
@@ -595,6 +617,25 @@ app.get('/api/verify/hash/:hash', async (req, res) => {
             });
         }
 
+        // Fetch org verification status
+        let verificationStatus = { status: 0, statusText: 'NOT_REQUESTED', verifierOrg: null, verificationDate: null, rejectionReason: '' };
+        if (orgRegistry && verificationId) {
+            try {
+                const statusData = await orgRegistry.getVerificationStatus(verificationId);
+                const statusNum = Number(statusData[0]);
+                const statusMap = ['NOT_REQUESTED', 'PENDING', 'VERIFIED', 'REJECTED'];
+                verificationStatus = {
+                    status: statusNum,
+                    statusText: statusMap[statusNum] || 'UNKNOWN',
+                    verifierOrg: statusData[1],
+                    rejectionReason: statusData[2],
+                    verificationDate: Number(statusData[3]) > 0 ? new Date(Number(statusData[3]) * 1000).toISOString() : null
+                };
+            } catch (e) { /* not requested yet */ }
+        }
+
+        const userId = owner.toLowerCase().replace('0x', '').slice(-16);
+
         res.json({
             verified: true,
             document: {
@@ -603,8 +644,10 @@ app.get('/api/verify/hash/:hash', async (req, res) => {
                 owner,
                 contentHash: formattedHash,
                 uploadedAt: new Date(Number(uploadedAt) * 1000).toISOString(),
-                verificationId
-            }
+                verificationId,
+                userId
+            },
+            verificationStatus
         });
 
     } catch (error) {
@@ -640,6 +683,25 @@ app.post('/api/verify/file', upload.single('document'), async (req, res) => {
             });
         }
 
+        // Fetch org verification status
+        let verificationStatus = { status: 0, statusText: 'NOT_REQUESTED', verifierOrg: null, verificationDate: null, rejectionReason: '' };
+        if (orgRegistry && verificationId) {
+            try {
+                const statusData = await orgRegistry.getVerificationStatus(verificationId);
+                const statusNum = Number(statusData[0]);
+                const statusMap = ['NOT_REQUESTED', 'PENDING', 'VERIFIED', 'REJECTED'];
+                verificationStatus = {
+                    status: statusNum,
+                    statusText: statusMap[statusNum] || 'UNKNOWN',
+                    verifierOrg: statusData[1],
+                    rejectionReason: statusData[2],
+                    verificationDate: Number(statusData[3]) > 0 ? new Date(Number(statusData[3]) * 1000).toISOString() : null
+                };
+            } catch (e) { /* not requested yet */ }
+        }
+
+        const userId = owner.toLowerCase().replace('0x', '').slice(-16);
+
         res.json({
             verified: true,
             document: {
@@ -648,8 +710,10 @@ app.post('/api/verify/file', upload.single('document'), async (req, res) => {
                 owner,
                 contentHash,
                 uploadedAt: new Date(Number(uploadedAt) * 1000).toISOString(),
-                verificationId
-            }
+                verificationId,
+                userId
+            },
+            verificationStatus
         });
 
     } catch (error) {
@@ -721,7 +785,27 @@ app.get('/api/verify/status/:verificationId', async (req, res) => {
 // ADMIN & ORGANIZATION ENDPOINTS
 // =============================================
 
-let PENDING_DOCUMENTS = [];
+// --- Persistent Pending Documents Store ---
+const PENDING_DOCS_FILE = path.join(__dirname, 'pending_docs.json');
+
+function loadPendingDocs() {
+    try {
+        if (fs.existsSync(PENDING_DOCS_FILE)) {
+            return JSON.parse(fs.readFileSync(PENDING_DOCS_FILE, 'utf8'));
+        }
+    } catch (e) {
+        console.error('Error reading pending_docs.json:', e.message);
+    }
+    return [];
+}
+
+function savePendingDocs(docs) {
+    try {
+        fs.writeFileSync(PENDING_DOCS_FILE, JSON.stringify(docs, null, 2), 'utf8');
+    } catch (e) {
+        console.error('Error writing pending_docs.json:', e.message);
+    }
+}
 
 // List authorized organizations
 app.get('/api/organizations', async (req, res) => {
@@ -769,17 +853,20 @@ app.post('/api/documents/request-verification', async (req, res) => {
         });
         await tx.wait();
 
-        // Track locally for the admin queue
-        PENDING_DOCUMENTS.push({
+        // Track locally for the admin queue (file-based)
+        const pendingDocs = loadPendingDocs();
+        pendingDocs.push({
             verificationId,
             targetOrg: normalizedOrg.toLowerCase(),
             userId: userWallet.address,
             docName: docInfo?.fileName || 'Document',
             docType: docInfo?.docType || 'Personal ID',
             driveFileId: docInfo?.ipfsHash,
+            contentHash: docInfo?.contentHash || '',
             uploadedAt: Date.now(),
             status: 'pending'
         });
+        savePendingDocs(pendingDocs);
 
         res.json({ success: true, message: 'Verification request sent on-chain' });
     } catch (error) {
@@ -791,12 +878,14 @@ app.post('/api/documents/request-verification', async (req, res) => {
 // Fetch pending documents for an organization
 app.get('/api/admin/pending/:orgAddress', (req, res) => {
     const orgAddress = req.params.orgAddress.toLowerCase();
+    const pendingDocs = loadPendingDocs();
+    const filtered = pendingDocs.filter(d =>
+        d.targetOrg === orgAddress && d.status === 'pending'
+    );
     res.json({
         success: true,
-        count: PENDING_DOCUMENTS.length,
-        documents: PENDING_DOCUMENTS.filter(d =>
-            d.targetOrg === orgAddress && d.status === 'pending'
-        )
+        count: filtered.length,
+        documents: filtered
     });
 });
 
@@ -845,11 +934,13 @@ app.post('/api/admin/verify', async (req, res) => {
         const receipt = await tx.wait();
         console.log(`✅ Verification recorded on chain: ${receipt.hash}`);
 
-        // Update local status
-        const docIndex = PENDING_DOCUMENTS.findIndex(d => d.verificationId === verificationId);
+        // Update local status (file-based)
+        const pendingDocsVerify = loadPendingDocs();
+        const docIndex = pendingDocsVerify.findIndex(d => d.verificationId === verificationId);
         if (docIndex !== -1) {
-            PENDING_DOCUMENTS[docIndex].status = 'verified';
-            PENDING_DOCUMENTS[docIndex].txHash = receipt.hash;
+            pendingDocsVerify[docIndex].status = 'verified';
+            pendingDocsVerify[docIndex].txHash = receipt.hash;
+            savePendingDocs(pendingDocsVerify);
         }
 
         res.json({
@@ -900,11 +991,13 @@ app.post('/api/admin/reject', async (req, res) => {
         });
         await tx.wait();
 
-        // Update local status
-        const docIndex = PENDING_DOCUMENTS.findIndex(d => d.verificationId === verificationId);
-        if (docIndex !== -1) {
-            PENDING_DOCUMENTS[docIndex].status = 'rejected';
-            PENDING_DOCUMENTS[docIndex].rejectionReason = reason;
+        // Update local status (file-based)
+        const pendingDocsReject = loadPendingDocs();
+        const docIndexR = pendingDocsReject.findIndex(d => d.verificationId === verificationId);
+        if (docIndexR !== -1) {
+            pendingDocsReject[docIndexR].status = 'rejected';
+            pendingDocsReject[docIndexR].rejectionReason = reason;
+            savePendingDocs(pendingDocsReject);
         }
 
         res.json({ success: true, message: 'Document rejected on-chain' });
@@ -914,26 +1007,7 @@ app.post('/api/admin/reject', async (req, res) => {
     }
 });
 
-// Admin verification status check
-app.get('/api/verify/status/:verificationId', async (req, res) => {
-    try {
-        const { verificationId } = req.params;
-        if (!orgRegistry) return res.status(503).json({ error: 'OrgRegistry not configured' });
-
-        const statusData = await orgRegistry.getVerificationStatus(verificationId);
-        // [status, verifierOrg, rejectionReason, lastUpdated]
-
-        res.json({
-            success: true,
-            status: Number(statusData[0]), // 0:NONE, 1:PENDING, 2:VERIFIED, 3:REJECTED
-            verifier: statusData[1],
-            rejectionReason: statusData[2],
-            lastUpdated: Number(statusData[3]) * 1000
-        });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
+// NOTE: Duplicate /api/verify/status/:verificationId route removed — already defined above (line ~692)
 
 // Get Audit Trail for a document
 app.get('/api/verify/audit/:verificationId', async (req, res) => {

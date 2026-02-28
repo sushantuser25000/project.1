@@ -9,6 +9,7 @@ function VerifyPage() {
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState(null);
     const [auditTrail, setAuditTrail] = useState([]);
+    const [verificationStatus, setVerificationStatus] = useState(null);
     const [error, setError] = useState(null);
     const [scanning, setScanning] = useState(false);
     const scannerRef = useRef(null);
@@ -46,6 +47,7 @@ function VerifyPage() {
         setLoading(true);
         setError(null);
         setResult(null);
+        setVerificationStatus(null);
 
         try {
             const response = await fetch(`${API_URL}/api/verify/id/${idToVerify}`, {
@@ -53,6 +55,9 @@ function VerifyPage() {
             });
             const data = await response.json();
             setResult(data);
+            if (data.verificationStatus) {
+                setVerificationStatus(data.verificationStatus);
+            }
             if (data.verified) {
                 fetchAuditTrail(idToVerify);
             }
@@ -86,6 +91,7 @@ function VerifyPage() {
         setLoading(true);
         setError(null);
         setResult(null);
+        setVerificationStatus(null);
 
         try {
             const formData = new FormData();
@@ -98,6 +104,9 @@ function VerifyPage() {
             });
             const data = await response.json();
             setResult(data);
+            if (data.verificationStatus) {
+                setVerificationStatus(data.verificationStatus);
+            }
             if (data.verified && data.document?.verificationId) {
                 fetchAuditTrail(data.document.verificationId);
             }
@@ -200,11 +209,29 @@ function VerifyPage() {
         }
     };
 
+    const getStatusBadge = () => {
+        if (!verificationStatus) return null;
+        const { status, statusText } = verificationStatus;
+        const badges = {
+            0: { icon: '📋', text: 'Not Requested', className: 'status-none' },
+            1: { icon: '⏳', text: 'Pending Review', className: 'status-pending' },
+            2: { icon: '✅', text: 'Verified by Organization', className: 'status-verified' },
+            3: { icon: '❌', text: 'Rejected', className: 'status-rejected' }
+        };
+        const badge = badges[status] || badges[0];
+        return (
+            <div className={`verification-status-badge ${badge.className}`}>
+                <span className="badge-icon">{badge.icon}</span>
+                <span className="badge-text">{badge.text}</span>
+            </div>
+        );
+    };
+
     return (
         <div className="verify-container">
             <div className="verify-header">
                 <h1>🔍 Document Verification</h1>
-                <p>Verify if a document is registered in the blockchain</p>
+                <p>Verify if a document is registered and certified on the blockchain</p>
             </div>
 
             {/* Method Selection */}
@@ -304,8 +331,12 @@ function VerifyPage() {
                         <>
                             <div className="result-header verified">
                                 <span className="status-icon">✅</span>
-                                <h2>VERIFIED</h2>
+                                <h2>DOCUMENT FOUND</h2>
                             </div>
+
+                            {/* Org Verification Status Badge */}
+                            {getStatusBadge()}
+
                             <div className="result-details">
                                 <div className="detail-row">
                                     <span className="label">Document:</span>
@@ -320,17 +351,44 @@ function VerifyPage() {
                                     <span className="value address">{result.document.owner}</span>
                                 </div>
                                 <div className="detail-row">
+                                    <span className="label">User ID:</span>
+                                    <span className="value mono">{result.document.userId}</span>
+                                </div>
+                                <div className="detail-row">
                                     <span className="label">Uploaded:</span>
                                     <span className="value">{new Date(result.document.uploadedAt).toLocaleString()}</span>
                                 </div>
                                 <div className="detail-row">
-                                    <span className="label">Verification ID:</span>
-                                    <span className="value">{result.document.verificationId}</span>
+                                    <span className="label">Doc ID:</span>
+                                    <span className="value mono">{result.document.verificationId}</span>
                                 </div>
                                 <div className="detail-row hash-row">
-                                    <span className="label">Hash:</span>
+                                    <span className="label">Doc Hash:</span>
                                     <span className="value hash">{result.document.contentHash}</span>
                                 </div>
+
+                                {/* Verification Metadata */}
+                                {verificationStatus && verificationStatus.status >= 1 && (
+                                    <div className="verification-metadata">
+                                        <h4>🏛️ Organization Verification Details</h4>
+                                        <div className="detail-row">
+                                            <span className="label">Verifier (Admin ID):</span>
+                                            <span className="value address">{verificationStatus.verifierOrg}</span>
+                                        </div>
+                                        {verificationStatus.verificationDate && (
+                                            <div className="detail-row">
+                                                <span className="label">Verification Date:</span>
+                                                <span className="value">{new Date(verificationStatus.verificationDate).toLocaleString()}</span>
+                                            </div>
+                                        )}
+                                        {verificationStatus.status === 3 && verificationStatus.rejectionReason && (
+                                            <div className="detail-row rejection-row">
+                                                <span className="label">Rejection Reason:</span>
+                                                <span className="value rejection-text">{verificationStatus.rejectionReason}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
 
                             {/* Audit Trail Section */}

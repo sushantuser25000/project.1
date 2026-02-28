@@ -140,10 +140,18 @@ function Documents({ contract, account, signer }) {
         if (!verifyingDoc) return;
         try {
             setUploading(true);
-            // We need user's private key to sign the request on-chain
-            // In a production app, we would use window.ethereum or a secure prompt
-            // For this demo, we can ask for it or use the one from state if available
-            const userKey = prompt("Please enter your Private Key to authorize this verification request on-chain:");
+            // Try to get private key from session first
+            let userKey = null;
+            const savedAuth = localStorage.getItem('eth_auth');
+            if (savedAuth) {
+                try {
+                    const authData = JSON.parse(savedAuth);
+                    userKey = authData.privateKey;
+                } catch (e) { /* ignore */ }
+            }
+            if (!userKey) {
+                userKey = prompt("Please enter your Private Key to authorize this verification request on-chain:");
+            }
             if (!userKey) throw new Error("Private key required");
 
             const response = await fetch(`${API_URL}/api/documents/request-verification`, {
@@ -301,9 +309,12 @@ function Documents({ contract, account, signer }) {
                                     <button
                                         onClick={() => setVerifyingDoc(doc)}
                                         className="action-btn verify"
-                                        disabled={docStatuses[doc.verificationId]?.status >= 1}
+                                        disabled={docStatuses[doc.verificationId]?.status === 1 || docStatuses[doc.verificationId]?.status === 2}
                                     >
-                                        {docStatuses[doc.verificationId]?.status >= 1 ? '🔁 Requested' : '🛡️ Request Verify'}
+                                        {docStatuses[doc.verificationId]?.status === 2 ? '✅ Verified' :
+                                            docStatuses[doc.verificationId]?.status === 1 ? '⏳ Pending' :
+                                                docStatuses[doc.verificationId]?.status === 3 ? '🔁 Re-request' :
+                                                    '🛡️ Request Verify'}
                                     </button>
                                     <button onClick={() => fetchDocStatus(doc.verificationId)} className="action-btn share" title="Refresh on-chain status">
                                         🔄 Refresh

@@ -82,6 +82,23 @@ contract UserAuth {
         emit UserRegistered(msg.sender, _username, block.timestamp);
     }
     
+    function registerUserFor(address _userAddress, string memory _username) public {
+        require(!isRegistered[_userAddress], "User already registered");
+        require(bytes(_username).length > 0, "Username cannot be empty");
+        
+        users[_userAddress] = User({
+            userAddress: _userAddress,
+            username: _username,
+            registeredAt: block.timestamp,
+            isActive: true
+        });
+        
+        isRegistered[_userAddress] = true;
+        userAddresses.push(_userAddress);
+        
+        emit UserRegistered(_userAddress, _username, block.timestamp);
+    }
+    
     function updateUsername(string memory _newUsername) public onlyRegistered onlyActive {
         require(bytes(_newUsername).length > 0, "Username cannot be empty");
         
