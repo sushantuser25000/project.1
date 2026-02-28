@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
 contract UserAuth {
@@ -82,23 +82,6 @@ contract UserAuth {
         emit UserRegistered(msg.sender, _username, block.timestamp);
     }
     
-    function registerUserFor(address _userAddress, string memory _username) public {
-        require(!isRegistered[_userAddress], "User already registered");
-        require(bytes(_username).length > 0, "Username cannot be empty");
-        
-        users[_userAddress] = User({
-            userAddress: _userAddress,
-            username: _username,
-            registeredAt: block.timestamp,
-            isActive: true
-        });
-        
-        isRegistered[_userAddress] = true;
-        userAddresses.push(_userAddress);
-        
-        emit UserRegistered(_userAddress, _username, block.timestamp);
-    }
-    
     function updateUsername(string memory _newUsername) public onlyRegistered onlyActive {
         require(bytes(_newUsername).length > 0, "Username cannot be empty");
         
@@ -160,41 +143,5 @@ contract UserAuth {
             s := mload(add(sig, 64))
             v := byte(0, mload(add(sig, 96)))
         }
-    }
-
-    function verifyByHash(bytes32 _hash) public view returns (bool verified, address owner, string memory fileName, string memory docType, string memory verificationId, uint256 uploadedAt) {
-        for (uint256 i = 0; i < userAddresses.length; i++) {
-            address userAddr = userAddresses[i];
-            for (uint256 j = 0; j < userDocuments[userAddr].length; j++) {
-                if (userDocuments[userAddr][j].contentHash == _hash) {
-                    Document memory doc = userDocuments[userAddr][j];
-                    return (true, userAddr, doc.fileName, doc.docType, doc.verificationId, doc.uploadedAt);
-                }
-            }
-        }
-        return (false, address(0), "", "", "", 0);
-    }
-
-    function verifyById(string memory _verificationId) public view returns (bool verified, address owner, string memory fileName, string memory docType, bytes32 contentHash, uint256 uploadedAt) {
-        for (uint256 i = 0; i < userAddresses.length; i++) {
-            address userAddr = userAddresses[i];
-            for (uint256 j = 0; j < userDocuments[userAddr].length; j++) {
-                if (keccak256(abi.encodePacked(userDocuments[userAddr][j].verificationId)) == keccak256(abi.encodePacked(_verificationId))) {
-                    Document memory doc = userDocuments[userAddr][j];
-                    return (true, userAddr, doc.fileName, doc.docType, doc.contentHash, doc.uploadedAt);
-                }
-            }
-        }
-        return (false, address(0), "", "", bytes32(0), 0);
-    }
-
-    function hashExists(bytes32 _hash) public view returns (bool) {
-        (bool verified, , , , , ) = verifyByHash(_hash);
-        return verified;
-    }
-
-    function verificationIdExists(string memory _verificationId) public view returns (bool) {
-        (bool verified, , , , , ) = verifyById(_verificationId);
-        return verified;
     }
 }

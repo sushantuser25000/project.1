@@ -34,7 +34,10 @@ contract UserAuth {
         _;
     }
     
-    // ... modifiers ...
+    modifier onlyActive() {
+        require(users[msg.sender].isActive, "User account is deactivated");
+        _;
+    }
 
     function addDocument(string memory _docType, string memory _fileName, string memory _ipfsHash, bytes32 _contentHash, string memory _verificationId) public onlyRegistered onlyActive {
         Document memory newDoc = Document({
@@ -58,11 +61,6 @@ contract UserAuth {
     
     function getMyDocuments() public view onlyRegistered returns (Document[] memory) {
         return userDocuments[msg.sender];
-    }
-    
-    modifier onlyActive() {
-        require(users[msg.sender].isActive, "User account is deactivated");
-        _;
     }
     
     function registerUser(string memory _username) public {
@@ -160,5 +158,41 @@ contract UserAuth {
             s := mload(add(sig, 64))
             v := byte(0, mload(add(sig, 96)))
         }
+    }
+
+    function verifyByHash(bytes32 _hash) public view returns (bool verified, address owner, string memory fileName, string memory docType, string memory verificationId, uint256 uploadedAt) {
+        for (uint256 i = 0; i < userAddresses.length; i++) {
+            address userAddr = userAddresses[i];
+            for (uint256 j = 0; j < userDocuments[userAddr].length; j++) {
+                if (userDocuments[userAddr][j].contentHash == _hash) {
+                    Document memory doc = userDocuments[userAddr][j];
+                    return (true, userAddr, doc.fileName, doc.docType, doc.verificationId, doc.uploadedAt);
+                }
+            }
+        }
+        return (false, address(0), "", "", "", 0);
+    }
+
+    function verifyById(string memory _verificationId) public view returns (bool verified, address owner, string memory fileName, string memory docType, bytes32 contentHash, uint256 uploadedAt) {
+        for (uint256 i = 0; i < userAddresses.length; i++) {
+            address userAddr = userAddresses[i];
+            for (uint256 j = 0; j < userDocuments[userAddr].length; j++) {
+                if (keccak256(abi.encodePacked(userDocuments[userAddr][j].verificationId)) == keccak256(abi.encodePacked(_verificationId))) {
+                    Document memory doc = userDocuments[userAddr][j];
+                    return (true, userAddr, doc.fileName, doc.docType, doc.contentHash, doc.uploadedAt);
+                }
+            }
+        }
+        return (false, address(0), "", "", bytes32(0), 0);
+    }
+
+    function hashExists(bytes32 _hash) public view returns (bool) {
+        (bool verified, , , , , ) = verifyByHash(_hash);
+        return verified;
+    }
+
+    function verificationIdExists(string memory _verificationId) public view returns (bool) {
+        (bool verified, , , , , ) = verifyById(_verificationId);
+        return verified;
     }
 }
