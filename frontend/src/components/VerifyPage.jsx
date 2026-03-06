@@ -8,46 +8,29 @@ function VerifyPage() {
     const [file, setFile] = useState(null);
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState(null);
-    const [auditTrail, setAuditTrail] = useState([]);
     const [verificationStatus, setVerificationStatus] = useState(null);
     const [error, setError] = useState(null);
     const [scanning, setScanning] = useState(false);
-    const scannerRef = useRef(null);
     const html5QrCodeRef = useRef(null);
 
     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-    // Check for ID in URL on load
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const id = params.get('id');
         if (id) {
             setVerificationId(id);
-            setVerificationMethod('id');
             verifyById(id);
         }
     }, []);
 
-    // Cleanup scanner on unmount
-    useEffect(() => {
-        return () => {
-            if (html5QrCodeRef.current) {
-                html5QrCodeRef.current.stop().catch(console.error);
-            }
-        };
-    }, []);
-
     const verifyById = async (id) => {
         const idToVerify = id || verificationId;
-        if (!idToVerify.trim()) {
-            setError('Please enter a verification ID');
-            return;
-        }
+        if (!idToVerify.trim()) return;
 
         setLoading(true);
         setError(null);
         setResult(null);
-        setVerificationStatus(null);
 
         try {
             const response = await fetch(`${API_URL}/api/verify/id/${idToVerify}`, {
@@ -55,43 +38,19 @@ function VerifyPage() {
             });
             const data = await response.json();
             setResult(data);
-            if (data.verificationStatus) {
-                setVerificationStatus(data.verificationStatus);
-            }
-            if (data.verified) {
-                fetchAuditTrail(idToVerify);
-            }
+            if (data.verificationStatus) setVerificationStatus(data.verificationStatus);
         } catch (err) {
-            setError('Verification failed: ' + err.message);
+            setError(err.message);
         } finally {
             setLoading(false);
         }
     };
 
-    const fetchAuditTrail = async (id) => {
-        try {
-            const response = await fetch(`${API_URL}/api/verify/audit/${id}`, {
-                headers: { 'Bypass-Tunnel-Reminder': 'true' }
-            });
-            const data = await response.json();
-            if (data.success) {
-                setAuditTrail(data.auditTrail);
-            }
-        } catch (err) {
-            console.error('Audit trail fetch failed:', err);
-        }
-    };
-
-    const verifyByFile = async () => {
-        if (!file) {
-            setError('Please select a file to verify');
-            return;
-        }
-
+    const handleFileVerify = async () => {
+        if (!file) return;
         setLoading(true);
         setError(null);
         setResult(null);
-        setVerificationStatus(null);
 
         try {
             const formData = new FormData();
@@ -104,48 +63,41 @@ function VerifyPage() {
             });
             const data = await response.json();
             setResult(data);
-            if (data.verificationStatus) {
-                setVerificationStatus(data.verificationStatus);
-            }
-            if (data.verified && data.document?.verificationId) {
-                fetchAuditTrail(data.document.verificationId);
-            }
+            if (data.verificationStatus) setVerificationStatus(data.verificationStatus);
         } catch (err) {
-            setError('Verification failed: ' + err.message);
+            setError(err.message);
         } finally {
             setLoading(false);
         }
     };
 
-    const startCameraScanner = async () => {
-        if (scanning) {
-            await stopScanner();
-            return;
-        }
+    useEffect(() => {
+        return () => {
+            if (html5QrCodeRef.current?.isScanning) {
+                html5QrCodeRef.current.stop().catch(console.error);
+            }
+        };
+    }, []);
 
-        setScanning(true);
-        setError(null);
-
+    const startScanner = async () => {
         try {
-            const html5QrCode = new Html5Qrcode("qr-reader");
+            setScanning(true);
+            setError(null);
+
+            const html5QrCode = new Html5Qrcode("reader");
             html5QrCodeRef.current = html5QrCode;
 
             await html5QrCode.start(
                 { facingMode: "environment" },
-                {
-                    fps: 10,
-                    qrbox: { width: 250, height: 250 }
-                },
+                { fps: 10, qrbox: { width: 250, height: 250 } },
                 (decodedText) => {
-                    handleQRResult(decodedText);
-                    stopScanner();
+                    handleScanSuccess(decodedText);
                 },
-                (errorMessage) => {
-                    // Ignore scan errors (no QR found)
-                }
+                () => { }
             );
         } catch (err) {
-            setError('Camera access failed: ' + err.message);
+            console.error(err);
+            setError("Camera access denied. Please allow camera permissions in your browser.");
             setScanning(false);
         }
     };
@@ -154,285 +106,207 @@ function VerifyPage() {
         if (html5QrCodeRef.current) {
             try {
                 await html5QrCodeRef.current.stop();
-            } catch (e) {
-                console.error('Error stopping scanner:', e);
+                html5QrCodeRef.current.clear();
+            } catch (err) {
+                console.error("Failed to stop scanner", err);
             }
         }
         setScanning(false);
     };
 
-    const handleImageUpload = async (e) => {
-        const imageFile = e.target.files[0];
-        if (!imageFile) return;
-
-        setError(null);
+    const handleQrFileUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
 
         try {
-            const html5QrCode = new Html5Qrcode("hidden-scanner");
-            const result = await html5QrCode.scanFile(imageFile, true);
-            handleQRResult(result);
-            html5QrCode.clear();
+            setError(null);
+            const html5QrCode = new Html5Qrcode("reader");
+            const decodedText = await html5QrCode.scanFile(file, true);
+            handleScanSuccess(decodedText);
         } catch (err) {
-            setError('Could not read QR code from image');
+            console.error(err);
+            setError("Could not read QR code from the provided image. Please ensure the QR is clear.");
         }
+        e.target.value = ''; // Reset input
     };
 
-    const handleQRResult = (text) => {
-        // Extract verification ID from URL or use as-is
+    const handleScanSuccess = (decodedText) => {
+        stopScanner();
         try {
-            const url = new URL(text);
+            const url = new URL(decodedText);
             const id = url.searchParams.get('id');
             if (id) {
                 setVerificationId(id);
                 setVerificationMethod('id');
                 verifyById(id);
-                return;
+            } else {
+                setVerificationId(decodedText);
+                setVerificationMethod('id');
+                verifyById(decodedText);
             }
-        } catch {
-            // Not a URL, check if it's a verification ID directly
-        }
-
-        if (text.startsWith('DOC-')) {
-            setVerificationId(text);
+        } catch (e) {
+            // Fallback if not a URL
+            setVerificationId(decodedText);
             setVerificationMethod('id');
-            verifyById(text);
-        } else {
-            setError('Invalid QR code');
+            verifyById(decodedText);
         }
     };
 
     const handleVerify = () => {
-        if (verificationMethod === 'id') {
-            verifyById();
-        } else {
-            verifyByFile();
-        }
-    };
-
-    const getStatusBadge = () => {
-        if (!verificationStatus) return null;
-        const { status, statusText } = verificationStatus;
-        const badges = {
-            0: { icon: '📋', text: 'Not Requested', className: 'status-none' },
-            1: { icon: '⏳', text: 'Pending Review', className: 'status-pending' },
-            2: { icon: '✅', text: 'Verified by Organization', className: 'status-verified' },
-            3: { icon: '❌', text: 'Rejected', className: 'status-rejected' }
-        };
-        const badge = badges[status] || badges[0];
-        return (
-            <div className={`verification-status-badge ${badge.className}`}>
-                <span className="badge-icon">{badge.icon}</span>
-                <span className="badge-text">{badge.text}</span>
-            </div>
-        );
+        if (verificationMethod === 'id') verifyById();
+        else handleFileVerify();
     };
 
     return (
         <div className="verify-container">
-            <div className="verify-header">
-                <h1>🔍 Document Verification</h1>
-                <p>Verify if a document is registered and certified on the blockchain</p>
-            </div>
-
-            {/* Method Selection */}
-            <div className="method-tabs">
-                <button
-                    className={`tab ${verificationMethod === 'id' ? 'active' : ''}`}
-                    onClick={() => setVerificationMethod('id')}
-                >
-                    📝 Verification ID
-                </button>
-                <button
-                    className={`tab ${verificationMethod === 'file' ? 'active' : ''}`}
-                    onClick={() => setVerificationMethod('file')}
-                >
-                    📁 Upload File
-                </button>
-                <button
-                    className={`tab ${verificationMethod === 'camera' ? 'active' : ''}`}
-                    onClick={() => setVerificationMethod('camera')}
-                >
-                    📷 Scan QR
-                </button>
-            </div>
-
             <div className="verify-card">
-                {/* ID Verification */}
-                {verificationMethod === 'id' && (
-                    <div className="verify-form">
-                        <label>Enter Verification ID</label>
+                <h2>BBDVAM Verification</h2>
+                <p>Verify document registration and certification on the private ledger.</p>
+
+                <div className="verify-methods">
+                    <button
+                        className={`method-tab ${verificationMethod === 'id' ? 'active' : ''}`}
+                        onClick={() => setVerificationMethod('id')}
+                    >
+                        Verification ID
+                    </button>
+                    <button
+                        className={`method-tab ${verificationMethod === 'file' ? 'active' : ''}`}
+                        onClick={() => setVerificationMethod('file')}
+                    >
+                        Upload File
+                    </button>
+                </div>
+
+                <div className="search-section">
+                    {verificationMethod === 'id' ? (
                         <input
                             type="text"
                             value={verificationId}
                             onChange={(e) => setVerificationId(e.target.value.toUpperCase())}
-                            placeholder="e.g., DOC-A3F7B2"
-                            className="verify-input"
+                            placeholder="Enter Verification ID (e.g. DOC-...)"
+                            className="search-input"
                         />
-                        <button onClick={handleVerify} disabled={loading} className="verify-btn">
-                            {loading ? 'Verifying...' : '✓ Verify Document'}
-                        </button>
-                    </div>
-                )}
+                    ) : (
+                        <div className="file-input-wrapper">
+                            <input
+                                type="file"
+                                onChange={(e) => setFile(e.target.files[0])}
+                                className="file-verify-input"
+                            />
+                        </div>
+                    )}
+                    <button onClick={handleVerify} disabled={loading} className="btn-verify">
+                        {loading ? '...' : 'Verify'}
+                    </button>
+                </div>
 
-                {/* File Verification */}
-                {verificationMethod === 'file' && (
-                    <div className="verify-form">
-                        <label>Upload Document to Verify</label>
-                        <input
-                            type="file"
-                            onChange={(e) => setFile(e.target.files[0])}
-                            className="verify-input file-input"
-                        />
-                        {file && <p className="file-name">Selected: {file.name}</p>}
-                        <button onClick={handleVerify} disabled={loading} className="verify-btn">
-                            {loading ? 'Computing Hash & Verifying...' : '✓ Verify Document'}
-                        </button>
-                    </div>
-                )}
+                {error && <div className="error-message">⚠️ {error}</div>}
 
-                {/* Camera/Image QR Scanner */}
-                {verificationMethod === 'camera' && (
-                    <div className="scanner-section">
-                        <div className="scanner-options">
-                            <button
-                                onClick={startCameraScanner}
-                                className={`scanner-btn ${scanning ? 'scanning' : ''}`}
-                            >
-                                {scanning ? '⏹ Stop Camera' : '📷 Start Camera'}
-                            </button>
-                            <label className="scanner-btn upload-label">
-                                🖼️ Upload QR Image
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={handleImageUpload}
-                                    style={{ display: 'none' }}
-                                />
-                            </label>
+                {result && result.verified && (
+                    <div className="result-card" style={{ borderColor: verificationStatus?.status === 2 ? '#4ade80' : 'var(--glass-border)' }}>
+                        <div className="result-header">
+                            <span className="result-status-icon">
+                                {verificationStatus?.status === 2 ? '💎' : '🛡️'}
+                            </span>
+                            <div className="result-title">
+                                <h3 style={{ color: verificationStatus?.status === 2 ? '#4ade80' : 'inherit' }}>
+                                    {verificationStatus?.status === 2 ? 'Certified Document' : 'Unverified Document'}
+                                </h3>
+                                <p style={{ margin: 0 }}>
+                                    {verificationStatus?.status === 2
+                                        ? 'Validated & Authenticated by Organization'
+                                        : 'Registered on Private Ethereum Ledger'}
+                                </p>
+                            </div>
                         </div>
 
-                        <div id="qr-reader" className={scanning ? 'active' : ''}></div>
-                        <div id="hidden-scanner" style={{ display: 'none' }}></div>
-                    </div>
-                )}
-            </div>
-
-            {/* Error Display */}
-            {error && (
-                <div className="error-message">
-                    ⚠️ {error}
-                </div>
-            )}
-
-            {/* Result Display */}
-            {result && (
-                <div className={`result-card ${result.verified ? 'verified' : 'not-found'}`}>
-                    {result.verified ? (
-                        <>
-                            <div className="result-header verified">
-                                <span className="status-icon">✅</span>
-                                <h2>DOCUMENT FOUND</h2>
+                        <div className="result-details">
+                            <div className="detail-item">
+                                <label>Document Name</label>
+                                <span>{result.document.fileName}</span>
                             </div>
-
-                            {/* Org Verification Status Badge */}
-                            {getStatusBadge()}
-
-                            <div className="result-details">
-                                <div className="detail-row">
-                                    <span className="label">Document:</span>
-                                    <span className="value">{result.document.fileName}</span>
-                                </div>
-                                <div className="detail-row">
-                                    <span className="label">Type:</span>
-                                    <span className="value">{result.document.docType}</span>
-                                </div>
-                                <div className="detail-row">
-                                    <span className="label">Owner:</span>
-                                    <span className="value address">{result.document.owner}</span>
-                                </div>
-                                <div className="detail-row">
-                                    <span className="label">User ID:</span>
-                                    <span className="value mono">{result.document.userId}</span>
-                                </div>
-                                <div className="detail-row">
-                                    <span className="label">Uploaded:</span>
-                                    <span className="value">{new Date(result.document.uploadedAt).toLocaleString()}</span>
-                                </div>
-                                <div className="detail-row">
-                                    <span className="label">Doc ID:</span>
-                                    <span className="value mono">{result.document.verificationId}</span>
-                                </div>
-                                <div className="detail-row hash-row">
-                                    <span className="label">Doc Hash:</span>
-                                    <span className="value hash">{result.document.contentHash}</span>
-                                </div>
-
-                                {/* Verification Metadata */}
-                                {verificationStatus && verificationStatus.status >= 1 && (
-                                    <div className="verification-metadata">
-                                        <h4>🏛️ Organization Verification Details</h4>
-                                        <div className="detail-row">
-                                            <span className="label">Verifier (Admin ID):</span>
-                                            <span className="value address">{verificationStatus.verifierOrg}</span>
-                                        </div>
-                                        {verificationStatus.verificationDate && (
-                                            <div className="detail-row">
-                                                <span className="label">Verification Date:</span>
-                                                <span className="value">{new Date(verificationStatus.verificationDate).toLocaleString()}</span>
-                                            </div>
-                                        )}
-                                        {verificationStatus.status === 3 && verificationStatus.rejectionReason && (
-                                            <div className="detail-row rejection-row">
-                                                <span className="label">Rejection Reason:</span>
-                                                <span className="value rejection-text">{verificationStatus.rejectionReason}</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
+                            <div className="detail-item">
+                                <label>Verification ID</label>
+                                <span>{result.document.verificationId}</span>
                             </div>
-
-                            {/* Audit Trail Section */}
-                            <div className="audit-section">
-                                <h3>📜 Official Audit Trail</h3>
-                                {auditTrail.length === 0 ? (
-                                    <p className="no-audit">This document is self-registered and pending official organization review.</p>
-                                ) : (
-                                    <div className="audit-list">
-                                        {auditTrail.map((log, index) => (
-                                            <div key={index} className="audit-item">
-                                                <div className="audit-header">
-                                                    <span className="verifier-org">🏦 {log.verifier}</span>
-                                                    <span className="audit-time">{log.timestamp}</span>
-                                                </div>
-                                                <p className="audit-remarks">{log.remarks}</p>
-                                            </div>
-                                        ))}
-                                        <div className="on-chain-verified-badge">
-                                            ✅ On-Chain Verified by Organization
-                                        </div>
-                                    </div>
-                                )}
+                            <div className="detail-item">
+                                <label>Type</label>
+                                <span>{result.document.docType}</span>
                             </div>
-                        </>
-                    ) : (
-                        <>
-                            <div className="result-header not-found">
-                                <span className="status-icon">❌</span>
-                                <h2>NOT FOUND</h2>
+                            <div className="detail-item">
+                                <label>Registry Date</label>
+                                <span>{new Date(result.document.uploadedAt).toLocaleString()}</span>
                             </div>
-                            <p className="not-found-message">
-                                {result.message || 'This document is not registered in the blockchain.'}
-                            </p>
-                            {result.computedHash && (
-                                <div className="computed-hash">
-                                    <span className="label">Computed Hash:</span>
-                                    <span className="value">{result.computedHash}</span>
+                            {verificationMethod === 'id' && (
+                                <div className="detail-item" style={{ gridColumn: '1/-1' }}>
+                                    <label>Content Hash (SHA-256)</label>
+                                    <span style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{result.document.contentHash}</span>
                                 </div>
                             )}
-                        </>
+                        </div>
+
+                        {verificationStatus && verificationStatus.status > 0 && (
+                            <div className="certification-badge-area" style={{ marginTop: '2rem', paddingTop: '2rem', borderTop: '1px solid var(--glass-border)' }}>
+                                <div className={`status-banner ${verificationStatus.statusText.toLowerCase()}`}>
+                                    <span className="status-label">ORGANIZATIONAL STATUS: {verificationStatus.statusText}</span>
+                                </div>
+                                <div className="cert-info-grid" style={{ marginTop: '1rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                    <div className="cert-item">
+                                        <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Verifier Organization</label>
+                                        <span style={{ fontSize: '0.9rem', fontWeight: '500' }}>{verificationStatus.verifierOrg || 'N/A'}</span>
+                                    </div>
+                                    <div className="cert-item">
+                                        <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+                                            {verificationStatus.status === 3 ? 'Rejection Reason' : 'Verifier Remarks'}
+                                        </label>
+                                        <span style={{ fontSize: '0.9rem', color: verificationStatus.status === 3 ? '#fb7185' : 'var(--primary-color)' }}>
+                                            {verificationStatus.rejectionReason || verificationStatus.remarks || 'Verified by official auditor'}
+                                        </span>
+                                    </div>
+                                    {verificationStatus.verificationDate && (
+                                        <div className="cert-item" style={{ gridColumn: '1/-1' }}>
+                                            <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>Verification Timestamp</label>
+                                            <span style={{ fontSize: '0.85rem' }}>{new Date(verificationStatus.verificationDate).toLocaleString()}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {result && !result.verified && (
+                    <div className="result-card" style={{ background: 'rgba(244, 63, 94, 0.05)', borderColor: 'rgba(244, 63, 94, 0.2)' }}>
+                        <div className="result-header">
+                            <span className="result-status-icon">❌</span>
+                            <div className="result-title">
+                                <h3 style={{ color: '#fb7185' }}>Verification Failed</h3>
+                                <p style={{ margin: 0 }}>This document is not registered on the ledger.</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                <div className="scanner-section">
+                    {!scanning ? (
+                        <div className="scanner-actions" style={{ display: 'flex', justifyContent: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                            <button className="btn-scanner" onClick={startScanner}>
+                                📷 Scan QR Code
+                            </button>
+                            <label className="btn-scanner" style={{ cursor: 'pointer', margin: 0 }}>
+                                🖼️ Upload QR Image
+                                <input type="file" accept="image/*" onChange={handleQrFileUpload} style={{ display: 'none' }} />
+                            </label>
+                        </div>
+                    ) : (
+                        <button className="btn-scanner" onClick={stopScanner} style={{ background: '#f43f5e', color: 'white', borderColor: '#f43f5e' }}>
+                            Stop Scanner
+                        </button>
                     )}
+                    <div id="reader" style={{ width: '100%', maxWidth: '400px', margin: '1rem auto 0', display: scanning ? 'block' : 'none' }}></div>
                 </div>
-            )}
+            </div>
         </div>
     );
 }

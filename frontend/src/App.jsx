@@ -164,21 +164,24 @@ function App() {
       const ethProvider = new ethers.JsonRpcProvider(rpcUrl);
       const wallet = new ethers.Wallet(privateKey, ethProvider);
 
-      const orgAddress = import.meta.env.VITE_ORG_REGISTRY_ADDRESS;
-      if (orgAddress) {
+      const orgRegistryAddr = import.meta.env.VITE_ORG_REGISTRY_ADDRESS;
+      let orgName = 'Organization Admin';
+
+      if (orgRegistryAddr) {
         const orgContract = new ethers.Contract(
-          orgAddress,
+          orgRegistryAddr,
           ["function organizations(address) public view returns (string, address, bool, uint256)"],
           ethProvider
         );
-        const orgInfo = await orgContract.organizations(wallet.address);
-        if (!orgInfo[2]) {
+        const info = await orgContract.organizations(wallet.address);
+        if (!info[2]) {
           throw new Error("Address is not an authorized organization.");
         }
+        if (info[0]) orgName = info[0];
       }
 
       setIsAdmin(true);
-      setUserInfo({ address: wallet.address, username: 'ACEM Admin' });
+      setUserInfo({ address: wallet.address, username: orgName });
       setIsAuthenticated(true);
       setView('admin-dashboard');
       initializeWeb3(privateKey);

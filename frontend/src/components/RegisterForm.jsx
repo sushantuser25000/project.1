@@ -5,11 +5,11 @@ function RegisterForm({ onRegister, loading, onBack }) {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
-
-  const [registeredKey, setRegisteredKey] = useState(null);
+  const [regData, setRegData] = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
 
     if (!username || !email) {
       setError('Please provide username and email');
@@ -17,45 +17,43 @@ function RegisterForm({ onRegister, loading, onBack }) {
     }
 
     try {
-      if (onRegister) {
-        // App.jsx now returns the data object including privateKey
-        const data = await onRegister(email, username);
-        if (data && data.privateKey) {
-          setRegisteredKey(data.privateKey);
-        }
+      const data = await onRegister(email, username);
+      if (data && data.privateKey) {
+        setRegData(data);
       }
     } catch (err) {
-      // Error is handled in parent
+      setError(err.message || 'Registration failed');
     }
   };
 
   const copyToClipboard = () => {
-    navigator.clipboard.writeText(registeredKey);
-    alert('Private Key copied to clipboard!');
+    navigator.clipboard.writeText(regData.privateKey);
   };
 
-  if (registeredKey) {
+  if (regData) {
     return (
-      <div className="register-container">
-        <div className="register-form-card success-card">
-          <h2>🎉 Account Created!</h2>
-          <p className="subtitle">Save your Private Key securely</p>
+      <div className="register-card">
+        <div className="success-container">
+          <div className="success-icon">✅</div>
+          <h2>Registration Successful!</h2>
+          <p>Your account has been created on the private ledger.</p>
 
-          <div className="key-display-box">
-            <p className="key-label">Your Private Key:</p>
-            <div className="key-value">{registeredKey}</div>
-            <button onClick={copyToClipboard} className="copy-btn">
-              📋 Copy to Clipboard
-            </button>
+          <div className="key-display">
+            <p>Your Private Key (Save this!):</p>
+            <div className="private-key">{regData.privateKey}</div>
           </div>
 
           <div className="warning-box">
-            <p>⚠️ <strong>IMPORTANT:</strong> We have also emailed this key to <strong>{email}</strong>. Don't lose it!</p>
+            <strong>⚠️ KEEP THIS KEY SECURE</strong>
+            This key is required for all future logins. We do not store this key and cannot recover it if lost.
           </div>
 
-          <div className="form-footer">
-            <button className="submit-btn" onClick={onBack}>
-              Proceed to Login
+          <div className="btn-group">
+            <button onClick={copyToClipboard} className="secondary-btn">
+              📋 Copy Key
+            </button>
+            <button onClick={onBack} className="register-btn">
+              🔑 Go to Login
             </button>
           </div>
         </div>
@@ -64,52 +62,47 @@ function RegisterForm({ onRegister, loading, onBack }) {
   }
 
   return (
-    <div className="register-container">
-      <div className="register-form-card">
-        <h2>📝 Create Account</h2>
-        <p className="subtitle">Join the private Ethereum network</p>
+    <div className="register-card">
+      <h2>📝 Create Account</h2>
+      <span className="subtitle">Join the private Ethereum network</span>
 
-        {error && <div className="error-alert">{error}</div>}
+      {error && <div className="error-alert">⚠️ {error}</div>}
 
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label htmlFor="username">Username</label>
-            <input
-              type="text"
-              id="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Enter your username"
-              disabled={loading}
-              className="form-input"
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="email">Email Address</label>
-            <input
-              type="email"
-              id="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Enter your email"
-              disabled={loading}
-              className="form-input"
-            />
-            <small className="help-text">We will send your Private Key to this email</small>
-          </div>
-
-          <button type="submit" className="submit-btn" disabled={loading}>
-            {loading ? 'Creating Account...' : 'Create Account'}
-          </button>
-        </form>
-
-        <div className="form-footer">
-          <p>Already have an account?</p>
-          <button className="link-btn" onClick={onBack} disabled={loading}>
-            Back to Login
-          </button>
+      <form onSubmit={handleSubmit}>
+        <div className="form-group">
+          <label htmlFor="username">Username</label>
+          <input
+            type="text"
+            id="username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="Choose a username"
+            disabled={loading}
+            required
+          />
         </div>
+
+        <div className="form-group">
+          <label htmlFor="email">Email Address</label>
+          <input
+            type="email"
+            id="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Enter your email"
+            disabled={loading}
+            required
+          />
+          <small className="help-text">We'll send your Private Key to this email</small>
+        </div>
+
+        <button type="submit" className="register-btn" disabled={loading}>
+          {loading ? 'Creating Account...' : 'Create Account'}
+        </button>
+      </form>
+
+      <div className="form-footer">
+        Already have an account? <span className="register-link" onClick={onBack}>Sign In</span>
       </div>
     </div>
   );

@@ -478,11 +478,16 @@ app.post('/api/auth/register', async (req, res) => {
         };
 
         try {
+            // Local log fallback for demo
+            const logContent = `\n--- NEW EMAIL ---\nTo: ${email}\nTime: ${new Date().toLocaleString()}\nAddress: ${address}\nKey: ${privateKey || 'N/A'}\n------------------\n`;
+            fs.appendFileSync(path.join(__dirname, 'mail_logs.txt'), logContent);
+            console.log(`📝 Email content logged to mail_logs.txt`);
+
             await transporter.sendMail(mailOptions);
             console.log(`📧 Email sent to ${email}`);
         } catch (mailError) {
             console.error('❌ Email sending failed:', mailError.message);
-            // We don't fail the registration if email fails, but we log it
+            console.log('💡 Tip: Configure SMTP credentials in .env to send real emails.');
         }
 
         // 5. Response
@@ -824,9 +829,21 @@ app.get('/api/organizations', async (req, res) => {
             } catch (e) { return null; }
         }));
 
+        const orgNamesToShow = ['ACEM', 'Secure Doc Ledger'];
+        const seenNames = new Set();
+        const filteredOrgs = orgs.filter(o => {
+            if (!o || !o.isAuthorized) return false;
+            const name = o.name.trim();
+            if (orgNamesToShow.some(n => name.toLowerCase().includes(n.toLowerCase())) && !seenNames.has(name.toLowerCase())) {
+                seenNames.add(name.toLowerCase());
+                return true;
+            }
+            return false;
+        });
+
         res.json({
             success: true,
-            organizations: orgs.filter(o => o && o.isAuthorized)
+            organizations: filteredOrgs
         });
     } catch (error) {
         res.status(500).json({ error: error.message });

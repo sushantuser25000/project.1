@@ -1,109 +1,129 @@
 import React, { useState, useEffect } from 'react';
+import { QRCodeCanvas } from 'qrcode.react';
+import { toPng } from 'html-to-image';
 import './Dashboard.css';
 
 function Dashboard({ userInfo, contract, signer }) {
-  const [blockNumber, setBlockNumber] = useState(null);
-  const [balance, setBalance] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [stats, setStats] = useState({
+    totalDocs: 0,
+    verifiedDocs: 0,
+    balance: '0'
+  });
 
   useEffect(() => {
-    fetchBlockchainData();
-  }, [signer]);
-
-  const fetchBlockchainData = async () => {
-    if (!signer) return;
-
-    try {
-      const provider = signer.provider;
-      const currentBlock = await provider.getBlockNumber();
-      setBlockNumber(currentBlock);
-
-      const userBalance = await provider.getBalance(userInfo.address);
-      setBalance(userBalance);
-    } catch (err) {
-      console.error('Error fetching blockchain data:', err);
+    if (contract && userInfo) {
+      loadStats();
     }
-  };
+  }, [contract, userInfo]);
 
-  const formatBalance = (balance) => {
-    if (!balance) return '0';
-    return parseFloat(balance.toString()) / 1e18;
-  };
-
-  const formatDate = (timestamp) => {
-    const date = new Date(parseInt(timestamp) * 1000);
-    return date.toLocaleString();
+  const loadStats = async () => {
+    try {
+      const docs = await contract.getUserDocuments(userInfo.address);
+      setStats(prev => ({ ...prev, totalDocs: docs.length }));
+    } catch (err) {
+      console.error("Error loading stats:", err);
+    }
   };
 
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
-    alert('Copied to clipboard!');
+  };
+
+  const downloadIDCard = () => {
+    const node = document.getElementById('user-id-card');
+    if (node) {
+      toPng(node, { cacheBust: true, style: { background: 'var(--bg-main, #0f172a)' } })
+        .then((dataUrl) => {
+          const link = document.createElement('a');
+          link.download = 'BBDVAM_ResidentID.png';
+          link.href = dataUrl;
+          link.click();
+        })
+        .catch((err) => {
+          console.error('Error downloading ID card:', err);
+          alert('Could not download ID card at this time.');
+        });
+    }
   };
 
   return (
     <div className="dashboard-container">
-      <div className="dashboard-header">
-        <h2>Welcome back, {userInfo.username}! 👋</h2>
-        <p>Your secure identity is active on the Document Ledger.</p>
+      <div className="welcome-section">
+        <div className="user-welcome">
+          <h2>Welcome back, {userInfo.username}! 👋</h2>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>BBDVAM Trusted Resident - {userInfo.address}</p>
+        </div>
+        <div className="header-status">
+          <span className={`badge ${userInfo.isActive ? 'active' : 'inactive'}`}>
+            {userInfo.isActive ? '🛡️ Identity Verified' : '❌ Account Inactive'}
+          </span>
+        </div>
       </div>
 
-      <div className="dashboard-grid">
-        <div className="info-card">
-          <h3>👤 Service Profile</h3>
-          <div className="info-row">
-            <label>Full Name:</label>
-            <span className="value">{userInfo.username}</span>
-          </div>
-          <div className="info-row">
-            <label>Public User ID:</label>
-            <div className="address-container">
-              <span className="value address">{userInfo.address}</span>
-              <button
-                onClick={() => copyToClipboard(userInfo.address)}
-                className="copy-btn"
-                title="Copy ID"
-              >
-                📋
-              </button>
+      <div className="stats-grid">
+        <div className="stat-card">
+          <h3>Total Documents</h3>
+          <div className="stat-value">{stats.totalDocs}</div>
+        </div>
+        <div className="stat-card">
+          <h3>Vault Status</h3>
+          <div className="stat-value">Encrypted</div>
+        </div>
+        <div className="stat-card">
+          <h3>Security Level</h3>
+          <div className="stat-value">High</div>
+        </div>
+      </div>
+
+      <div className="upload-section">
+        <h3>Manage Your Secure Vault</h3>
+        <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>
+          Your documents are encrypted using AES-256 and stored with immutable proof on the blockchain.
+        </p>
+        <button
+          className="btn-upload"
+          onClick={() => {
+            alert("Please use the 'Documents' tab to upload and manage your files.");
+          }}
+        >
+          📂 Open Document Vault
+        </button>
+      </div>
+
+      <div className="id-card-section">
+        <h3>Your Digital ID</h3>
+        <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
+          Download your blockchain-verified Resident ID Card.
+        </p>
+
+        <div className="id-card-container">
+          <div id="user-id-card" className="id-card-visual">
+            <div className="id-card-header">
+              <h4>BBDVAM</h4>
+              <span>Resident Identity Card</span>
+            </div>
+            <div className="id-card-body">
+              <div className="id-card-details">
+                <p><strong>Name:</strong> {userInfo.username}</p>
+                <p><strong>Status:</strong> <span style={{ color: userInfo.isActive ? '#10b981' : '#f43f5e' }}>{userInfo.isActive ? 'Verified Resident' : 'Unverified'}</span></p>
+                <p className="wallet-address"><strong>Address:</strong><br />{userInfo.address}</p>
+              </div>
+              <div className="id-card-qr">
+                <div style={{ background: '#fff', padding: '8px', borderRadius: '8px', display: 'inline-block' }}>
+                  <QRCodeCanvas value={`verify:${userInfo.address}`} size={90} />
+                </div>
+              </div>
+            </div>
+            <div className="id-card-footer">
+              <p>🔒 Secured by Blockchain Validation</p>
             </div>
           </div>
-          <div className="info-row">
-            <label>Member Since:</label>
-            <span className="value">{formatDate(userInfo.registeredAt)}</span>
-          </div>
-          <div className="info-row">
-            <label>Verification Status:</label>
-            <span className={`badge ${userInfo.isActive ? 'active' : 'inactive'}`}>
-              {userInfo.isActive ? '✓ Verified Identity' : '✗ Suspended'}
-            </span>
-          </div>
         </div>
 
-        <div className="info-card">
-          <h3>📂 Quick Actions</h3>
-          <p className="helper-text">Manage your encrypted documents and verify public ledger entries.</p>
-          <div className="action-buttons-dashboard">
-            <button className="btn btn-primary" onClick={() => window.dispatchEvent(new CustomEvent('changeTab', { detail: 'documents' }))}>
-              Manage Vault
-            </button>
-            <button className="btn btn-secondary" onClick={() => window.location.href = '/verify'}>
-              Public Verification
-            </button>
-          </div>
-        </div>
+        <button onClick={downloadIDCard} className="btn-upload btn-download-id">
+          ⬇️ Download ID Card
+        </button>
       </div>
-
-      <div className="dashboard-footer">
-        <div className="feature-info">
-          <h4>✨ Secure doc ledger Features</h4>
-          <ul>
-            <li>Military-grade AES-256 document encryption</li>
-            <li>Immutable audit trails via private blockchain</li>
-            <li>Zero-password architecture (Private Key sign-in)</li>
-          </ul>
-        </div>
-      </div>
-
     </div>
   );
 }

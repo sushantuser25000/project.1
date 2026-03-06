@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { QRCodeSVG } from 'qrcode.react';
+import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react';
 import './Documents.css';
 
 function Documents({ contract, account, signer }) {
@@ -10,6 +10,7 @@ function Documents({ contract, account, signer }) {
     const [organizations, setOrganizations] = useState([]);
     const [verifyingDoc, setVerifyingDoc] = useState(null);
     const [docStatuses, setDocStatuses] = useState({});
+    const [certifyModeDocId, setCertifyModeDocId] = useState(null);
 
     // Form State
     const [file, setFile] = useState(null);
@@ -48,10 +49,9 @@ function Documents({ contract, account, signer }) {
                 ipfsHash: d.ipfsHash,
                 contentHash: d.contentHash,
                 verificationId: d.verificationId,
-                uploadedAt: new Date(Number(d.uploadedAt) * 1000).toLocaleString()
+                uploadedAt: new Date(Number(d.uploadedAt) * 1000).toLocaleDateString()
             }));
             setDocuments(formattedDocs);
-            // Fetch statuses for these documents
             formattedDocs.forEach(d => fetchDocStatus(d.verificationId));
         } catch (error) {
             console.error("Error loading documents:", error);
@@ -69,26 +69,17 @@ function Documents({ contract, account, signer }) {
             if (data.success) {
                 setDocStatuses(prev => ({ ...prev, [verId]: data }));
             }
-        } catch (e) { console.error(e); }
-    };
-
-    const handleFileChange = (e) => {
-        if (e.target.files[0]) {
-            setFile(e.target.files[0]);
+        } catch (e) {
+            console.error(e);
         }
     };
 
     const handleUpload = async (e) => {
         e.preventDefault();
-        if (!file || !docName) {
-            alert("Please select a file and provide a name.");
-            return;
-        }
+        if (!file || !docName) return;
 
         try {
             setUploading(true);
-
-            // 1. Upload to Backend (Encrypt & Store)
             const formData = new FormData();
             formData.append('document', file);
             formData.append('address', account);
@@ -102,58 +93,53 @@ function Documents({ contract, account, signer }) {
             });
 
             const data = await response.json();
-            if (!data.success) throw new Error(data.error || 'Upload failed');
-
-            const { path: serverPath, contentHash, verificationId } = data;
-
-            // 2. Store Metadata on Chain (with hash and verification ID)
-            console.log("Storing metadata on chain...");
-            console.log("- Params:", { docType, docName, serverPath, contentHash, verificationId });
+            if (!data.success) throw new Error(data.error);
 
             const contractWithSigner = contract.connect(signer);
-
             const tx = await contractWithSigner.addDocument(
                 docType,
                 docName,
-                serverPath,
-                contentHash,
-                verificationId,
-                { gasLimit: 500000 }
+                data.path,
+                data.contentHash,
+                data.verificationId
             );
-            console.log("- Tx Hash:", tx.hash);
             await tx.wait();
 
-            alert(`Document uploaded successfully!\nVerification ID: ${verificationId}`);
             setFile(null);
             setDocName('');
             loadDocuments();
-
         } catch (error) {
-            console.error("Upload error:", error);
-            alert("Upload failed: " + error.message);
+            alert(error.message);
         } finally {
             setUploading(false);
         }
     };
 
-    const handleRequestVerification = async (targetOrg) => {
-        if (!verifyingDoc) return;
+    const [showAudit, setShowAudit] = useState(null);
+    const [auditData, setAuditData] = useState([]);
+    const [requestingOrg, setRequestingOrg] = useState('');
+
+    const fetchAuditTrail = async (verId) => {
+        try {
+            const response = await fetch(`${API_URL}/api/verify/audit/${verId}`, {
+                headers: { 'Bypass-Tunnel-Reminder': 'true' }
+            });
+            const data = await response.json();
+            if (data.success) {
+                setAuditData(data.auditTrail);
+                setShowAudit(verId);
+            }
+        } catch (e) { console.error(e); }
+    };
+
+    const handleRequestVerification = async (doc) => {
+        if (!requestingOrg) return alert("Select an organization");
+
+        const privateKey = prompt("Please enter your private key to authorize this on-chain request:");
+        if (!privateKey) return;
+
         try {
             setUploading(true);
-            // Try to get private key from session first
-            let userKey = null;
-            const savedAuth = localStorage.getItem('eth_auth');
-            if (savedAuth) {
-                try {
-                    const authData = JSON.parse(savedAuth);
-                    userKey = authData.privateKey;
-                } catch (e) { /* ignore */ }
-            }
-            if (!userKey) {
-                userKey = prompt("Please enter your Private Key to authorize this verification request on-chain:");
-            }
-            if (!userKey) throw new Error("Private key required");
-
             const response = await fetch(`${API_URL}/api/documents/request-verification`, {
                 method: 'POST',
                 headers: {
@@ -161,218 +147,171 @@ function Documents({ contract, account, signer }) {
                     'Bypass-Tunnel-Reminder': 'true'
                 },
                 body: JSON.stringify({
-                    verificationId: verifyingDoc.verificationId,
-                    targetOrg: targetOrg,
-                    userPrivateKey: userKey,
-                    docInfo: verifyingDoc
+                    verificationId: doc.verificationId,
+                    targetOrg: requestingOrg,
+                    userPrivateKey: privateKey,
+                    docInfo: doc
                 })
             });
-
             const data = await response.json();
             if (data.success) {
-                alert("Verification request sent successfully!");
-                fetchDocStatus(verifyingDoc.verificationId);
+                alert("Certification request sent to organization!");
+                setCertifyModeDocId(null);
+                loadDocuments();
             } else {
-                throw new Error(data.error || "Request failed");
+                throw new Error(data.error);
             }
         } catch (error) {
-            alert("Error: " + error.message);
+            alert("Request failed: " + error.message);
         } finally {
             setUploading(false);
-            setVerifyingDoc(null);
         }
     };
 
-    const handlePreview = (doc) => {
-        window.open(`${API_URL}/api/documents/preview/${account}/${doc.ipfsHash}?name=${encodeURIComponent(doc.fileName)}`, '_blank');
+    const getStatusInfo = (verId) => {
+        const status = docStatuses[verId]?.status;
+        if (status === 2) return { label: 'Certified', class: 'verified', icon: '💎' };
+        if (status === 1) return { label: 'Pending', class: 'pending', icon: '⏳' };
+        if (status === 3) return { label: 'Rejected', class: 'rejected', icon: '❌' };
+        return { label: 'Unverified', class: 'unverified', icon: '🛡️' };
     };
 
-    const handleDownload = (doc) => {
-        window.open(`${API_URL}/api/documents/download/${account}/${doc.ipfsHash}?name=${encodeURIComponent(doc.fileName)}`, '_blank');
-    };
-
-    const handleCopyId = (verificationId) => {
-        navigator.clipboard.writeText(verificationId);
-        alert(`Copied: ${verificationId}`);
-    };
-
-    const handleCopyHash = (hash) => {
-        navigator.clipboard.writeText(hash);
-        alert("Hash copied to clipboard!");
-    };
-
-    const handleShareLink = (verificationId) => {
-        const link = `${window.location.origin}/verify?id=${verificationId}`;
-        navigator.clipboard.writeText(link);
-        alert("Verification link copied!");
-    };
-
-    const toggleQR = (docId) => {
-        setShowQR(showQR === docId ? null : docId);
+    const downloadQR = (docName) => {
+        const canvas = document.getElementById('qr-code-canvas');
+        if (canvas) {
+            const pngUrl = canvas.toDataURL("image/png");
+            const downloadLink = document.createElement("a");
+            downloadLink.href = pngUrl;
+            downloadLink.download = `${docName}_QR.png`;
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+        }
     };
 
     return (
         <div className="documents-container">
-            <h2>📂 Secure Document Vault</h2>
+            <div className="docs-header">
+                <h2>Secure Vault</h2>
+                <p>Manage your encrypted credentials and institutional certifications.</p>
+            </div>
 
-            {/* Upload Section */}
-            <div className="upload-card">
-                <h3>Upload New Document</h3>
-                <form onSubmit={handleUpload}>
-                    <div className="form-group">
-                        <label>Document Type</label>
-                        <select value={docType} onChange={(e) => setDocType(e.target.value)} className="form-input">
-                            <option>Personal ID</option>
-                            <option>Financial Record</option>
-                            <option>Medical Report</option>
-                            <option>Legal Contract</option>
-                            <option>Other</option>
-                        </select>
-                    </div>
-
+            <div className="upload-section" style={{ marginBottom: '3rem' }}>
+                <form onSubmit={handleUpload} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', alignItems: 'end' }}>
                     <div className="form-group">
                         <label>Document Name</label>
-                        <input
-                            type="text"
-                            value={docName}
-                            onChange={(e) => setDocName(e.target.value)}
-                            placeholder="e.g., Drivers License"
-                            className="form-input"
-                        />
+                        <input type="text" value={docName} onChange={(e) => setDocName(e.target.value)} placeholder="e.g. Identity Card" required />
                     </div>
-
                     <div className="form-group">
-                        <label>Select File</label>
-                        <input type="file" onChange={handleFileChange} className="form-input" />
+                        <label>Type</label>
+                        <select value={docType} onChange={(e) => setDocType(e.target.value)}>
+                            <option>Personal ID</option>
+                            <option>Financial</option>
+                            <option>Medical</option>
+                            <option>Legal</option>
+                            <option>Others</option>
+                        </select>
                     </div>
-
-                    <button type="submit" className="upload-btn" disabled={uploading}>
-                        {uploading ? 'Encrypting & Uploading...' : '🔒 Secure Upload'}
+                    <div className="form-group">
+                        <label>File</label>
+                        <input type="file" onChange={(e) => setFile(e.target.files[0])} required />
+                    </div>
+                    <button type="submit" className="btn-upload" disabled={uploading}>
+                        {uploading ? '🔒 Securing...' : '🔒 Secure Upload'}
                     </button>
                 </form>
             </div>
 
-            {/* List Section */}
-            <div className="list-card">
-                <h3>My Documents</h3>
+            <div className="docs-grid">
                 {loading ? (
-                    <p>Loading chain data...</p>
+                    [1, 2, 3].map(i => <div key={i} className="loading-skeleton" />)
                 ) : documents.length === 0 ? (
-                    <p className="empty-state">No documents stored yet.</p>
+                    <div className="empty-state" style={{ gridColumn: '1/-1' }}>
+                        <div className="empty-icon">📂</div>
+                        <h3>Your vault is empty</h3>
+                        <p>Upload your first document to secure it on the ledger.</p>
+                    </div>
                 ) : (
-                    <ul className="doc-list">
-                        {documents.map(doc => (
-                            <li key={doc.id} className="doc-item-expanded">
-                                <div className="doc-header">
-                                    <div className="doc-icon">📄</div>
-                                    <div className="doc-info">
-                                        <h4>
-                                            {doc.fileName}
-                                            {docStatuses[doc.verificationId]?.status === 2 && <span className="status-badge verified" title="Verified on Chain"> ✅</span>}
-                                            {docStatuses[doc.verificationId]?.status === 1 && <span className="status-badge pending" title="Verification Pending"> ⏳</span>}
-                                            {docStatuses[doc.verificationId]?.status === 3 && <span className="status-badge rejected" title={`Rejected: ${docStatuses[doc.verificationId]?.rejectionReason}`}> ❌</span>}
-                                        </h4>
-                                        <span className="doc-meta">{doc.docType} • {doc.uploadedAt}</span>
-                                        {docStatuses[doc.verificationId]?.status === 3 && (
-                                            <div className="rejection-box">
-                                                <strong>Reason:</strong> {docStatuses[doc.verificationId]?.rejectionReason}
+                    documents.map(doc => {
+                        const status = getStatusInfo(doc.verificationId);
+                        const isUnverified = !docStatuses[doc.verificationId] || docStatuses[doc.verificationId].status === 0;
+                        const isRejected = docStatuses[doc.verificationId]?.status === 3;
+
+                        return (
+                            <div key={doc.id} className="doc-card">
+                                <div className="doc-type-badge">{doc.docType}</div>
+                                <div className="doc-name">{doc.fileName}</div>
+                                <div className="doc-id">{doc.verificationId}</div>
+                                <div className="doc-meta">
+                                    <span>📅 {doc.uploadedAt}</span>
+                                    <span className={`status-badge ${status.class}`} onClick={() => fetchAuditTrail(doc.verificationId)} style={{ cursor: 'pointer' }} title="Click for history">
+                                        {status.icon} {status.label}
+                                    </span>
+                                </div>
+
+                                {(isUnverified || isRejected) && (
+                                    <div className="certify-request">
+                                        {certifyModeDocId === doc.id ? (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', width: '100%' }}>
+                                                <select value={requestingOrg} onChange={(e) => setRequestingOrg(e.target.value)} className="org-select">
+                                                    <option value="">Select Verifier...</option>
+                                                    {organizations.map(org => (
+                                                        <option key={org.address} value={org.address}>{org.name}</option>
+                                                    ))}
+                                                </select>
+                                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                    <button onClick={() => handleRequestVerification(doc)} className="btn-request-cert" style={{ flex: 1 }}>Confirm</button>
+                                                    <button onClick={() => setCertifyModeDocId(null)} className="btn-doc-action" style={{ background: 'rgba(255,255,255,0.1)' }}>Cancel</button>
+                                                </div>
                                             </div>
+                                        ) : (
+                                            <button onClick={() => setCertifyModeDocId(doc.id)} className="btn-request-cert" style={{ width: '100%' }}>Request Certification</button>
                                         )}
                                     </div>
+                                )}
+
+                                <div className="doc-actions">
+                                    <button onClick={() => window.open(`${API_URL}/api/documents/preview/${account}/${doc.ipfsHash}?name=${encodeURIComponent(doc.fileName)}`, '_blank')} className="btn-doc-action">Preview</button>
+                                    <button onClick={() => window.open(`${API_URL}/api/documents/download/${account}/${doc.ipfsHash}?name=${encodeURIComponent(doc.fileName)}`, '_blank')} className="btn-doc-action">Download</button>
+                                    <button onClick={() => setShowQR(showQR === doc.id ? null : doc.id)} className="btn-doc-action">QR Proof</button>
                                 </div>
 
-                                {/* Verification Info */}
-                                <div className="verification-info">
-                                    <div className="verification-id" onClick={() => handleCopyId(doc.verificationId)}>
-                                        <span className="label">ID:</span>
-                                        <span className="value">{doc.verificationId}</span>
-                                        <span className="copy-icon">📋</span>
-                                    </div>
-                                    <div className="doc-hash" onClick={() => handleCopyHash(doc.contentHash)}>
-                                        <span className="label">Hash:</span>
-                                        <span className="value">{doc.contentHash?.slice(0, 10)}...{doc.contentHash?.slice(-8)}</span>
-                                        <span className="copy-icon">📋</span>
-                                    </div>
-                                </div>
-
-                                {/* Actions */}
-                                <div className="doc-actions-grid">
-                                    <button onClick={() => handleDownload(doc)} className="action-btn download">
-                                        ⬇️ Download
-                                    </button>
-                                    <button onClick={() => handlePreview(doc)} className="action-btn preview">
-                                        👁️ View
-                                    </button>
-                                    <button onClick={() => toggleQR(doc.id)} className="action-btn qr">
-                                        📱 QR Code
-                                    </button>
-                                    <button
-                                        onClick={() => setVerifyingDoc(doc)}
-                                        className="action-btn verify"
-                                        disabled={docStatuses[doc.verificationId]?.status === 1 || docStatuses[doc.verificationId]?.status === 2}
-                                    >
-                                        {docStatuses[doc.verificationId]?.status === 2 ? '✅ Verified' :
-                                            docStatuses[doc.verificationId]?.status === 1 ? '⏳ Pending' :
-                                                docStatuses[doc.verificationId]?.status === 3 ? '🔁 Re-request' :
-                                                    '🛡️ Request Verify'}
-                                    </button>
-                                    <button onClick={() => fetchDocStatus(doc.verificationId)} className="action-btn share" title="Refresh on-chain status">
-                                        🔄 Refresh
-                                    </button>
-                                    <button onClick={() => handleShareLink(doc.verificationId)} className="action-btn share">
-                                        🔗 Share
-                                    </button>
-                                </div>
-
-                                {/* QR Code Popup */}
                                 {showQR === doc.id && (
-                                    <div className="qr-popup">
-                                        <QRCodeSVG
+                                    <div className="qr-overlay">
+                                        <QRCodeCanvas
+                                            id="qr-code-canvas"
                                             value={`${window.location.origin}/verify?id=${doc.verificationId}`}
-                                            size={150}
-                                            level="M"
+                                            size={160}
                                         />
-                                        <p className="qr-id">{doc.verificationId}</p>
-                                        <button className="close-qr" onClick={() => setShowQR(null)}>✕</button>
+                                        <p className="qr-hint">Scan to verify authenticity</p>
+                                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', justifyContent: 'center' }}>
+                                            <button onClick={() => downloadQR(doc.fileName)} className="btn-doc-action" style={{ background: 'var(--primary-color)' }}>Download</button>
+                                            <button onClick={() => setShowQR(null)} className="btn-close">Close</button>
+                                        </div>
                                     </div>
                                 )}
-                            </li>
-                        ))}
-                    </ul>
+                            </div>
+                        );
+                    })
                 )}
             </div>
 
-            {/* Verification Request Modal */}
-            {verifyingDoc && (
+            {showAudit && (
                 <div className="modal-overlay">
-                    <div className="modal-content">
-                        <h3>Request Official Verification</h3>
-                        <p>Document: <strong>{verifyingDoc.fileName}</strong></p>
-                        <p>Select an Organization to review and verify this document on the blockchain:</p>
-
-                        <select id="orgSelect" className="form-input" style={{ marginBottom: '20px' }} defaultValue="">
-                            <option value="" disabled>-- Choose Organization --</option>
-                            {organizations.map(org => (
-                                <option key={org.address} value={org.address}>
-                                    {org.name} ({org.address.slice(0, 8)}...)
-                                </option>
-                            ))}
-                        </select>
-
-                        <div className="modal-actions">
-                            <button onClick={() => setVerifyingDoc(null)} className="cancel-btn">Cancel</button>
-                            <button
-                                onClick={() => {
-                                    const addr = document.getElementById('orgSelect').value;
-                                    if (addr) handleRequestVerification(addr);
-                                    else alert("Please select an organization");
-                                }}
-                                className="confirm-btn"
-                                disabled={uploading}
-                            >
-                                {uploading ? 'Processing...' : 'Send Request'}
-                            </button>
+                    <div className="audit-modal">
+                        <h3>Certification History</h3>
+                        <div className="audit-list">
+                            {auditData.length === 0 ? <p>No verification events recorded.</p> :
+                                auditData.map((event, idx) => (
+                                    <div key={idx} className="audit-item">
+                                        <div className="audit-verifier">{event.verifier}</div>
+                                        <div className="audit-time">{new Date(event.timestamp).toLocaleString()}</div>
+                                        <div className="audit-remarks">"{event.remarks}"</div>
+                                    </div>
+                                ))
+                            }
                         </div>
+                        <button onClick={() => setShowAudit(null)} className="btn-close">Close</button>
                     </div>
                 </div>
             )}

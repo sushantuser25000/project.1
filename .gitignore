@@ -91,3 +91,44 @@ start_ngrok.js
 deployment_summary.json
 verification_summary.json
 address.txt
+# =============================================
+# REPORTS & DOCUMENTATION
+# =============================================
+*.tex
+*.pdf
+*.aux
+*.fdb_latexmk
+*.fls
+*.gz
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.bbl
+*.blg
+
+# Report-specific images/folders 
+# (Common patterns for LaTeX reports)
+report/
+documentation/
+figures/
+images_report/
+*.png
+*.jpg
+*.jpeg
+*.svg
+*.webp
+
+# EXCLUSIONS: Keep necessary project assets
+!frontend/public/**
+!frontend/src/assets/**
+!README.md
+!*.md
+
+# =============================================
+# CLUTTER
+# =============================================
+creds.json
+org_keys.json
+test_out.txt
+test_flow.js
