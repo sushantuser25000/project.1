@@ -15,6 +15,7 @@
 7. [Roles & Access](#7-roles--access)
 8. [Security Notes](#8-security-notes)
 9. [Troubleshooting](#9-troubleshooting)
+10. [Managing LAN IP Changes](#10-managing-lan-ip-changes)
 
 ---
 
@@ -143,7 +144,7 @@ cd frontend
 npm run dev
 
 # Browser: http://localhost:3000
-# LAN access: http://192.168.254.6:3000
+# LAN access: http://192.168.254.8:3000
 ```
 
 ### Useful Geth Console Commands
@@ -189,8 +190,8 @@ SMTP_PASS=<16-char-app-password>
 
 ### `frontend/.env`
 ```env
-VITE_API_URL=http://192.168.254.6:5000
-VITE_RPC_URL=http://192.168.254.6:8545
+VITE_API_URL=http://192.168.254.8:5000
+VITE_RPC_URL=http://192.168.254.8:8545
 VITE_CHAIN_ID=2025
 VITE_CONTRACT_ADDRESS=0xE594562239A22f784A673977220d8CaC89D3E085
 VITE_ORG_REGISTRY_ADDRESS=0x865e6BD09310477d8F4cA566b09b00a30e01CB61
@@ -234,3 +235,29 @@ The Geth node uses the sealer account (`0x6bbb7f...`) to produce blocks and fund
 | Contract address mismatch | Re-deploy via `hardhat-example/deploy-vanilla.js` and update both `.env` files |
 | 403 on LAN device | Check Windows Firewall — open ports 3000, 5000, 8545 for private network |
 | Camera not working for QR | Browser needs HTTPS for camera. Use LAN IP or set chrome flag for insecure origins |
+
+---
+
+## 10. Managing LAN IP Changes
+
+Since your router might change your IP address (DHCP), you may occasionally need to sync the project to a new address.
+
+### 1. How to Find Your Current LAN IP
+1.  Open **Command Prompt** or **PowerShell**.
+2.  Type `ipconfig` and press Enter.
+3.  Look for **IPv4 Address** under your active connection (Wi-Fi or Ethernet). 
+    *Example: `192.168.254.8`*
+
+### 2. Where to Update the IP in Project
+If your IP changes, you must update these 3 locations:
+
+1.  **`frontend/.env`**:
+    *   `VITE_API_URL=http://<YOUR_NEW_IP>:5000`
+    *   `VITE_RPC_URL=http://<YOUR_NEW_IP>:8545`
+2.  **`frontend/vite.config.js`**:
+    *   Update the `allowedHosts` array with the new IP string.
+3.  **`PROJECT_MASTER_GUIDE.md`**:
+    *   Update the "LAN access" link in section 5 and environment variables in section 6.
+
+### 💡 Pro Tip: Static IP
+To stop the IP from changing, you can set a **Static IP** in your Windows Network Settings. This forces your router to always give this PC the same address.

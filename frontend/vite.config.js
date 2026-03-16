@@ -7,6 +7,6 @@ export default defineConfig({
   server: {
     port: 3000,
     open: true,
-    allowedHosts: ['.loca.lt', '.ngrok-free.app', '.ngrok-free.dev', 'localhost', '192.168.254.6']
+    allowedHosts: ['.loca.lt', '.ngrok-free.app', '.ngrok-free.dev', 'localhost', '192.168.254.8']
   }
 })
