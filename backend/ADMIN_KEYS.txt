@@ -1,0 +1,28 @@
+============================================================
+  BBDVAM - ADMIN ORGANIZATION PRIVATE KEYS
+  !! NEVER SHARE OR COMMIT THIS FILE !!
+============================================================
+
+--- ACEM Admin ---
+Address    : 0x25750C3E613F1edAE6e1395D1fEC5C2e15DF5AC6
+Private Key: 0x4595c9e77f1212466bb5a4e8728969e8288e3f989cb1bd3cf33d741c153585da
+
+--- Secure Doc Ledger (SDL) Admin ---
+Address    : 0x1336D19b7Aa8a1b15723620E06C3b013D0afB9b3
+Private Key: 0x60258dced794fa7c086c70bc1e826a7ebefb590f54b72c8c2732e91990b0e172
+
+--- Org 1 (Legacy / Test) ---
+Address    : 0xDC398F1C2CbcfA50256CC94EA328AF85738DDa20
+Private Key: 0x45d10e47035bbb947c4a6376dd22b13f6a7ab91b173435b5c35a2de70e85d03c
+
+============================================================
+  BLOCKCHAIN SEALER (Block Miner)
+============================================================
+Address    : 0x6bbb7f23448dbf15ebb4f0a2f0e09fc9b2bd9c2f
+(Private key managed by Geth node via keystore - see Geth data dir)
+
+============================================================
+  CURRENTLY DEPLOYED CONTRACTS (Chain ID: 2025)
+============================================================
+UserAuth Contract  : 0xE594562239A22f784A673977220d8CaC89D3E085
+OrgRegistry Contract: 0x865e6BD09310477d8F4cA566b09b00a30e01CB61
