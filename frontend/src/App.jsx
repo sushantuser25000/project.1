@@ -237,13 +237,13 @@ function App() {
   return (
     <div className="App">
       <header className="App-header">
-        <h1>🔐 Secure Doc Ledger</h1>
+        <h1>Secure Doc Ledger</h1>
         <div className="header-actions">
-          <button onClick={() => setView('landing')} className="nav-btn">🏠 Home</button>
-          <button onClick={() => setView('verify')} className="nav-btn">🔍 Verify</button>
+          <button onClick={() => setView('landing')} className="nav-btn">Home</button>
+          <button onClick={() => setView('verify')} className="nav-btn">Verify</button>
           {isAuthenticated && (
             <div className="user-info-header">
-              <span>👤 {userInfo.username}</span>
+              <span>{userInfo.username}</span>
               <button onClick={handleLogout} className="logout-btn">Logout</button>
             </div>
           )}
@@ -253,7 +253,7 @@ function App() {
       <main className="App-main">
         {error && (
           <div className="error-message">
-            ⚠️ {error}
+            {error}
           </div>
         )}
 
@@ -261,13 +261,13 @@ function App() {
           <div className="landing-page">
             <div className="landing-blocks">
               <div className="landing-card" onClick={() => setView('login')}>
-                <div className="icon">🔑</div>
+                <div className="icon"></div>
                 <h2>User Login</h2>
                 <p>Access your personal document vault and upload new credentials.</p>
                 <button className="landing-btn">Open Vault</button>
               </div>
               <div className="landing-card" onClick={() => setView('verify')}>
-                <div className="icon">🔍</div>
+                <div className="icon"></div>
                 <h2>Verify Document</h2>
                 <p>Publicly verify any document ledger entry without logging in.</p>
                 <button className="landing-btn">Verify Now</button>
@@ -275,7 +275,7 @@ function App() {
             </div>
             <div className="landing-footer">
               <p>Don't have an account? <span className="link" onClick={() => setView('register')}>Sign Up Now</span></p>
-              <p className="admin-link" onClick={() => setView('admin-login')}>🔐 Organization access</p>
+              <p className="admin-link" onClick={() => setView('admin-login')}>Organization access</p>
             </div>
           </div>
         )}
@@ -322,13 +322,13 @@ function App() {
                 className={`nav-tab ${currentTab === 'dashboard' ? 'active' : ''}`}
                 onClick={() => { setCurrentTab('dashboard'); setView('dashboard'); }}
               >
-                🏠 Dashboard
+                Dashboard
               </button>
               <button
                 className={`nav-tab ${currentTab === 'documents' ? 'active' : ''}`}
                 onClick={() => { setCurrentTab('documents'); setView('dashboard'); }}
               >
-                📂 Documents
+                Documents
               </button>
             </div>
 

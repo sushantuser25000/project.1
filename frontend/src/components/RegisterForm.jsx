@@ -34,7 +34,7 @@ function RegisterForm({ onRegister, loading, onBack }) {
     return (
       <div className="register-card">
         <div className="success-container">
-          <div className="success-icon">✅</div>
+          <div className="success-icon"></div>
           <h2>Registration Successful!</h2>
           <p>Your account has been created on the private ledger.</p>
 
@@ -44,16 +44,16 @@ function RegisterForm({ onRegister, loading, onBack }) {
           </div>
 
           <div className="warning-box">
-            <strong>⚠️ KEEP THIS KEY SECURE</strong>
+            <strong>KEEP THIS KEY SECURE</strong>
             This key is required for all future logins. We do not store this key and cannot recover it if lost.
           </div>
 
           <div className="btn-group">
             <button onClick={copyToClipboard} className="secondary-btn">
-              📋 Copy Key
+              Copy Key
             </button>
             <button onClick={onBack} className="register-btn">
-              🔑 Go to Login
+              Go to Login
             </button>
           </div>
         </div>
@@ -63,10 +63,10 @@ function RegisterForm({ onRegister, loading, onBack }) {
 
   return (
     <div className="register-card">
-      <h2>📝 Create Account</h2>
+      <h2>Create Account</h2>
       <span className="subtitle">Join the private Ethereum network</span>
 
-      {error && <div className="error-alert">⚠️ {error}</div>}
+      {error && <div className="error-alert">{error}</div>}
 
       <form onSubmit={handleSubmit}>
         <div className="form-group">

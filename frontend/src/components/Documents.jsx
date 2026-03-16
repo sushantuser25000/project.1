@@ -170,10 +170,10 @@ function Documents({ contract, account, signer }) {
 
     const getStatusInfo = (verId) => {
         const status = docStatuses[verId]?.status;
-        if (status === 2) return { label: 'Certified', class: 'verified', icon: '💎' };
-        if (status === 1) return { label: 'Pending', class: 'pending', icon: '⏳' };
-        if (status === 3) return { label: 'Rejected', class: 'rejected', icon: '❌' };
-        return { label: 'Unverified', class: 'unverified', icon: '🛡️' };
+        if (status === 2) return { label: 'Certified', class: 'verified', icon: '' };
+        if (status === 1) return { label: 'Pending', class: 'pending', icon: '' };
+        if (status === 3) return { label: 'Rejected', class: 'rejected', icon: '' };
+        return { label: 'Unverified', class: 'unverified', icon: '' };
     };
 
     const downloadQR = (docName) => {
@@ -217,7 +217,7 @@ function Documents({ contract, account, signer }) {
                         <input type="file" onChange={(e) => setFile(e.target.files[0])} required />
                     </div>
                     <button type="submit" className="btn-upload" disabled={uploading}>
-                        {uploading ? '🔒 Securing...' : '🔒 Secure Upload'}
+                        {uploading ? 'Securing...' : 'Secure Upload'}
                     </button>
                 </form>
             </div>
@@ -227,7 +227,7 @@ function Documents({ contract, account, signer }) {
                     [1, 2, 3].map(i => <div key={i} className="loading-skeleton" />)
                 ) : documents.length === 0 ? (
                     <div className="empty-state" style={{ gridColumn: '1/-1' }}>
-                        <div className="empty-icon">📂</div>
+                        <div className="empty-icon"></div>
                         <h3>Your vault is empty</h3>
                         <p>Upload your first document to secure it on the ledger.</p>
                     </div>
@@ -243,7 +243,7 @@ function Documents({ contract, account, signer }) {
                                 <div className="doc-name">{doc.fileName}</div>
                                 <div className="doc-id">{doc.verificationId}</div>
                                 <div className="doc-meta">
-                                    <span>📅 {doc.uploadedAt}</span>
+                                    <span>{doc.uploadedAt}</span>
                                     <span className={`status-badge ${status.class}`} onClick={() => fetchAuditTrail(doc.verificationId)} style={{ cursor: 'pointer' }} title="Click for history">
                                         {status.icon} {status.label}
                                     </span>

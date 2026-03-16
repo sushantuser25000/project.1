@@ -201,14 +201,12 @@ function VerifyPage() {
                     </button>
                 </div>
 
-                {error && <div className="error-message">⚠️ {error}</div>}
+                {error && <div className="error-message">{error}</div>}
 
                 {result && result.verified && (
                     <div className="result-card" style={{ borderColor: verificationStatus?.status === 2 ? '#4ade80' : 'var(--glass-border)' }}>
                         <div className="result-header">
-                            <span className="result-status-icon">
-                                {verificationStatus?.status === 2 ? '💎' : '🛡️'}
-                            </span>
+                            <span className="result-status-icon"></span>
                             <div className="result-title">
                                 <h3 style={{ color: verificationStatus?.status === 2 ? '#4ade80' : 'inherit' }}>
                                     {verificationStatus?.status === 2 ? 'Certified Document' : 'Unverified Document'}
@@ -279,7 +277,7 @@ function VerifyPage() {
                 {result && !result.verified && (
                     <div className="result-card" style={{ background: 'rgba(244, 63, 94, 0.05)', borderColor: 'rgba(244, 63, 94, 0.2)' }}>
                         <div className="result-header">
-                            <span className="result-status-icon">❌</span>
+                            <span className="result-status-icon"></span>
                             <div className="result-title">
                                 <h3 style={{ color: '#fb7185' }}>Verification Failed</h3>
                                 <p style={{ margin: 0 }}>This document is not registered on the ledger.</p>
@@ -292,10 +290,10 @@ function VerifyPage() {
                     {!scanning ? (
                         <div className="scanner-actions" style={{ display: 'flex', justifyContent: 'center', gap: '1rem', flexWrap: 'wrap' }}>
                             <button className="btn-scanner" onClick={startScanner}>
-                                📷 Scan QR Code
+                                Scan QR Code
                             </button>
                             <label className="btn-scanner" style={{ cursor: 'pointer', margin: 0 }}>
-                                🖼️ Upload QR Image
+                                Upload QR Image
                                 <input type="file" accept="image/*" onChange={handleQrFileUpload} style={{ display: 'none' }} />
                             </label>
                         </div>

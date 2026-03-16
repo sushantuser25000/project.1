@@ -22,7 +22,7 @@ function LoginForm({ onLogin, loading, onShowRegister, title, onBack }) {
 
   return (
     <div className="login-card">
-      {title && title.includes('Admin') && <div className="admin-badge">🔐 Admin Access</div>}
+      {title && title.includes('Admin') && <div className="admin-badge">Admin Access</div>}
 
       {onBack && (
         <button onClick={onBack} className="back-btn">
@@ -50,7 +50,7 @@ function LoginForm({ onLogin, loading, onShowRegister, title, onBack }) {
               onClick={() => setShowPassword(!showPassword)}
               aria-label={showPassword ? "Hide password" : "Show password"}
             >
-              {showPassword ? '👁️' : '👁️‍🗨️'}
+              {showPassword ? '-' : '+'}
             </button>
           </div>
         </div>
@@ -66,7 +66,7 @@ function LoginForm({ onLogin, loading, onShowRegister, title, onBack }) {
       )}
 
       <div className="security-notice">
-        <p>⚠️ Security Notice</p>
+        <p>Security Notice</p>
         <ul>
           <li>Never share your private key</li>
           <li>Your key is stored only in your browser</li>

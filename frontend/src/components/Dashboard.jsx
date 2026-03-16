@@ -50,12 +50,12 @@ function Dashboard({ userInfo, contract, signer }) {
     <div className="dashboard-container">
       <div className="welcome-section">
         <div className="user-welcome">
-          <h2>Welcome back, {userInfo.username}! 👋</h2>
+          <h2>Welcome back, {userInfo.username}!</h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>BBDVAM Trusted Resident - {userInfo.address}</p>
         </div>
         <div className="header-status">
           <span className={`badge ${userInfo.isActive ? 'active' : 'inactive'}`}>
-            {userInfo.isActive ? '🛡️ Identity Verified' : '❌ Account Inactive'}
+            {userInfo.isActive ? 'Identity Verified' : 'Account Inactive'}
           </span>
         </div>
       </div>
@@ -86,7 +86,7 @@ function Dashboard({ userInfo, contract, signer }) {
             alert("Please use the 'Documents' tab to upload and manage your files.");
           }}
         >
-          📂 Open Document Vault
+          Open Document Vault
         </button>
       </div>
 
@@ -115,13 +115,13 @@ function Dashboard({ userInfo, contract, signer }) {
               </div>
             </div>
             <div className="id-card-footer">
-              <p>🔒 Secured by Blockchain Validation</p>
+              <p>Secured by Blockchain Validation</p>
             </div>
           </div>
         </div>
 
         <button onClick={downloadIDCard} className="btn-upload btn-download-id">
-          ⬇️ Download ID Card
+          Download ID Card
         </button>
       </div>
     </div>
