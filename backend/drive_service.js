@@ -42,7 +42,7 @@ async function uploadFile(fileBuffer, fileName, mimeType, folderId) {
     const fileId = `file_${Date.now()}_${baseName}${extension}`;
     const filePath = path.join(UPLOADS_DIR, fileId);
     fs.writeFileSync(filePath, fileBuffer);
-    console.log('✅ File saved to local storage:', fileId);
+    console.log(' File saved to local storage:', fileId);
 
     // 2. Optional: Mirror to Google Drive if enabled
     if (GOOGLE_DRIVE_ENABLED) {
@@ -60,9 +60,9 @@ async function uploadFile(fileBuffer, fileName, mimeType, folderId) {
                 const response = await driveInstance.files.create({
                     resource: fileMetadata, media, fields: 'id'
                 });
-                console.log('🚀 Mirror copy uploaded to Google Drive:', response.data.id);
+                console.log(' Mirror copy uploaded to Google Drive:', response.data.id);
             } catch (error) {
-                console.warn('⚠️ Mirror to Drive failed (continuing with local only):', error.message);
+                console.warn(' Mirror to Drive failed (continuing with local only):', error.message);
             }
         }
     }
@@ -74,7 +74,7 @@ async function downloadFile(fileId) {
     // 1. Always check Local first (Primary)
     const filePath = path.join(UPLOADS_DIR, fileId);
     if (fs.existsSync(filePath)) {
-        console.log('⚡ Retrieving from local storage:', fileId);
+        console.log(' Retrieving from local storage:', fileId);
         return fs.readFileSync(filePath);
     }
 

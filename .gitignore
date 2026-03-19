@@ -124,6 +124,8 @@ images_report/
 !frontend/src/assets/**
 !README.md
 !*.md
+# Ignore personal master guide
+PROJECT_MASTER_GUIDE.md
 
 # =============================================
 # CLUTTER
@@ -132,3 +134,4 @@ creds.json
 org_keys.json
 test_out.txt
 test_flow.js
+mail_logs.txt
